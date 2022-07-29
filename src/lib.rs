@@ -18,17 +18,14 @@
 //! into an Abstract Syntax Tree (AST).
 //!
 //! ```
-//! use sqlparser::dialect::GenericDialect;
 //! use sqlparser::parser::Parser;
-//!
-//! let dialect = GenericDialect {}; // or AnsiDialect
 //!
 //! let sql = "SELECT a, b, 123, myfunc(b) \
 //!            FROM table_1 \
 //!            WHERE a > b AND b < 100 \
 //!            ORDER BY a DESC, b";
 //!
-//! let ast = Parser::parse_sql(&dialect, sql).unwrap();
+//! let ast = Parser::parse_sql_query(sql).unwrap();
 //!
 //! println!("AST: {:?}", ast);
 //! ```
@@ -45,7 +42,7 @@ extern crate pretty_assertions;
 
 pub mod ast;
 #[macro_use]
-pub mod dialect;
+// pub mod dialect;
 pub mod keywords;
 pub mod parser;
 pub mod tokenizer;
@@ -55,3 +52,4 @@ pub mod tokenizer;
 // unit-tests and by the integration tests <https://stackoverflow.com/a/44541071/1026>
 // External users are not supposed to rely on this module.
 pub mod test_utils;
+pub mod dialect;
