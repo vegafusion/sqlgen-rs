@@ -7,6 +7,20 @@ pub struct Dialect {
     pub quote_style: Option<char>
 }
 
+impl Dialect {
+    pub fn datafusion() -> Self {
+        Self {
+            quote_style: Some('"')
+        }
+    }
+
+    pub fn sqlite() -> Self {
+        Self {
+            quote_style: Some('"')
+        }
+    }
+}
+
 impl Default for Dialect {
     fn default() -> Self {
         Self {
