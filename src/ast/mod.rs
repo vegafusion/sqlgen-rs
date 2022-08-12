@@ -1069,16 +1069,13 @@ pub struct Function {
 
 impl DialectDisplay for Function {
     fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> fmt::Result {
-        let name = if !dialect.quote_functions {
-            // Clone name and remove quotes so we don't quote function names
-            let mut name = self.name.clone();
+        let mut name = self.name.clone();
+        if !dialect.quote_functions {
+            // Remove quotes so we don't quote function names
             for ident in name.0.iter_mut() {
                 ident.quote_style = None
             }
-            name
-        } else {
-            name
-        };
+        }
 
         write!(
             f,
