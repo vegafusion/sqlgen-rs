@@ -24,9 +24,9 @@ use alloc::{
 };
 use core::fmt;
 
+use crate::dialect::{Dialect, DialectDisplay};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use crate::dialect::{Dialect, DialectDisplay};
 
 pub use self::data_type::DataType;
 pub use self::operator::{BinaryOperator, UnaryOperator};
@@ -426,7 +426,13 @@ impl DialectDisplay for Expr {
                 low.sql(dialect)?,
                 high.sql(dialect)?
             ),
-            Expr::BinaryOp { left, op, right } => write!(f, "{} {} {}", left.sql(dialect)?, op.sql(dialect)?, right.sql(dialect)?),
+            Expr::BinaryOp { left, op, right } => write!(
+                f,
+                "{} {} {}",
+                left.sql(dialect)?,
+                op.sql(dialect)?,
+                right.sql(dialect)?
+            ),
             Expr::AnyOp(expr) => write!(f, "ANY({})", expr.sql(dialect)?),
             Expr::AllOp(expr) => write!(f, "ALL({})", expr.sql(dialect)?),
             Expr::UnaryOp { op, expr } => {
@@ -436,16 +442,45 @@ impl DialectDisplay for Expr {
                     write!(f, "{} {}", op.sql(dialect)?, expr.sql(dialect)?)
                 }
             }
-            Expr::Cast { expr, data_type } => write!(f, "CAST({} AS {})", expr.sql(dialect)?, data_type.sql(dialect)?),
-            Expr::TryCast { expr, data_type } => write!(f, "TRY_CAST({} AS {})", expr.sql(dialect)?, data_type.sql(dialect)?),
-            Expr::Extract { field, expr } => write!(f, "EXTRACT({} FROM {})", field.sql(dialect)?, expr.sql(dialect)?),
-            Expr::Position { expr, r#in } => write!(f, "POSITION({} IN {})", expr.sql(dialect)?, r#in.sql(dialect)?),
-            Expr::Collate { expr, collation } => write!(f, "{} COLLATE {}", expr.sql(dialect)?, collation.sql(dialect)?),
+            Expr::Cast { expr, data_type } => write!(
+                f,
+                "CAST({} AS {})",
+                expr.sql(dialect)?,
+                data_type.sql(dialect)?
+            ),
+            Expr::TryCast { expr, data_type } => write!(
+                f,
+                "TRY_CAST({} AS {})",
+                expr.sql(dialect)?,
+                data_type.sql(dialect)?
+            ),
+            Expr::Extract { field, expr } => write!(
+                f,
+                "EXTRACT({} FROM {})",
+                field.sql(dialect)?,
+                expr.sql(dialect)?
+            ),
+            Expr::Position { expr, r#in } => write!(
+                f,
+                "POSITION({} IN {})",
+                expr.sql(dialect)?,
+                r#in.sql(dialect)?
+            ),
+            Expr::Collate { expr, collation } => write!(
+                f,
+                "{} COLLATE {}",
+                expr.sql(dialect)?,
+                collation.sql(dialect)?
+            ),
             Expr::Nested(ast) => write!(f, "({})", ast.sql(dialect)?),
             Expr::Value(v) => write!(f, "{}", v.sql(dialect)?),
             Expr::TypedString { data_type, value } => {
                 write!(f, "{}", data_type.sql(dialect)?)?;
-                write!(f, " '{}'", &value::escape_single_quote_string(value).sql(dialect)?)
+                write!(
+                    f,
+                    " '{}'",
+                    &value::escape_single_quote_string(value).sql(dialect)?
+                )
             }
             Expr::Function(fun) => write!(f, "{}", fun.sql(dialect)?),
             Expr::Case {
@@ -528,12 +563,28 @@ impl DialectDisplay for Expr {
 
                 write!(f, ")")
             }
-            Expr::IsDistinctFrom(a, b) => write!(f, "{} IS DISTINCT FROM {}", a.sql(dialect)?, b.sql(dialect)?),
-            Expr::IsNotDistinctFrom(a, b) => write!(f, "{} IS NOT DISTINCT FROM {}", a.sql(dialect)?, b.sql(dialect)?),
+            Expr::IsDistinctFrom(a, b) => write!(
+                f,
+                "{} IS DISTINCT FROM {}",
+                a.sql(dialect)?,
+                b.sql(dialect)?
+            ),
+            Expr::IsNotDistinctFrom(a, b) => write!(
+                f,
+                "{} IS NOT DISTINCT FROM {}",
+                a.sql(dialect)?,
+                b.sql(dialect)?
+            ),
             Expr::Trim { expr, trim_where } => {
                 write!(f, "TRIM(")?;
                 if let Some((ident, trim_char)) = trim_where {
-                    write!(f, "{} {} FROM {}", ident.sql(dialect)?, trim_char.sql(dialect)?, expr.sql(dialect)?)?;
+                    write!(
+                        f,
+                        "{} {} FROM {}",
+                        ident.sql(dialect)?,
+                        trim_char.sql(dialect)?,
+                        expr.sql(dialect)?
+                    )?;
                 } else {
                     write!(f, "{}", expr.sql(dialect)?)?;
                 }
@@ -558,7 +609,13 @@ impl DialectDisplay for Expr {
                 operator,
                 right,
             } => {
-                write!(f, "{} {} {}", left.sql(dialect)?, operator.sql(dialect)?, right.sql(dialect)?)
+                write!(
+                    f,
+                    "{} {} {}",
+                    left.sql(dialect)?,
+                    operator.sql(dialect)?,
+                    right.sql(dialect)?
+                )
             }
             Expr::CompositeAccess { expr, key } => {
                 write!(f, "{}.{}", expr.sql(dialect)?, key.sql(dialect)?)
@@ -567,7 +624,12 @@ impl DialectDisplay for Expr {
                 timestamp,
                 time_zone,
             } => {
-                write!(f, "{} AT TIME ZONE '{}'", timestamp.sql(dialect)?, time_zone)
+                write!(
+                    f,
+                    "{} AT TIME ZONE '{}'",
+                    timestamp.sql(dialect)?,
+                    time_zone
+                )
             }
         }
     }
@@ -596,7 +658,11 @@ impl DialectDisplay for WindowSpec {
         if !self.order_by.is_empty() {
             f.write_str(delim)?;
             delim = " ";
-            write!(f, "ORDER BY {}", display_comma_separated(&self.order_by).sql(dialect)?)?;
+            write!(
+                f,
+                "ORDER BY {}",
+                display_comma_separated(&self.order_by).sql(dialect)?
+            )?;
         }
         if let Some(window_frame) = &self.window_frame {
             f.write_str(delim)?;
@@ -604,10 +670,17 @@ impl DialectDisplay for WindowSpec {
                 write!(
                     f,
                     "{} BETWEEN {} AND {}",
-                    window_frame.units.sql(dialect)?, window_frame.start_bound.sql(dialect)?, end_bound.sql(dialect)?
+                    window_frame.units.sql(dialect)?,
+                    window_frame.start_bound.sql(dialect)?,
+                    end_bound.sql(dialect)?
                 )?;
             } else {
-                write!(f, "{} {}", window_frame.units.sql(dialect)?, window_frame.start_bound.sql(dialect)?)?;
+                write!(
+                    f,
+                    "{} {}",
+                    window_frame.units.sql(dialect)?,
+                    window_frame.start_bound.sql(dialect)?
+                )?;
             }
         }
         Ok(())
@@ -876,10 +949,18 @@ impl DialectDisplay for GrantObjects {
     fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> fmt::Result {
         match self {
             GrantObjects::Sequences(sequences) => {
-                write!(f, "SEQUENCE {}", display_comma_separated(sequences).sql(dialect)?)
+                write!(
+                    f,
+                    "SEQUENCE {}",
+                    display_comma_separated(sequences).sql(dialect)?
+                )
             }
             GrantObjects::Schemas(schemas) => {
-                write!(f, "SCHEMA {}", display_comma_separated(schemas).sql(dialect)?)
+                write!(
+                    f,
+                    "SCHEMA {}",
+                    display_comma_separated(schemas).sql(dialect)?
+                )
             }
             GrantObjects::Tables(tables) => {
                 write!(f, "{}", display_comma_separated(tables).sql(dialect)?)
@@ -912,7 +993,12 @@ pub struct Assignment {
 
 impl DialectDisplay for Assignment {
     fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> fmt::Result {
-        write!(f, "{} = {}", display_separated(&self.id, ".").sql(dialect)?, self.value.sql(dialect)?)
+        write!(
+            f,
+            "{} = {}",
+            display_separated(&self.id, ".").sql(dialect)?,
+            self.value.sql(dialect)?
+        )
     }
 }
 
@@ -946,7 +1032,9 @@ pub enum FunctionArg {
 impl DialectDisplay for FunctionArg {
     fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> fmt::Result {
         match self {
-            FunctionArg::Named { name, arg } => write!(f, "{} => {}", name.sql(dialect)?, arg.sql(dialect)?),
+            FunctionArg::Named { name, arg } => {
+                write!(f, "{} => {}", name.sql(dialect)?, arg.sql(dialect)?)
+            }
             FunctionArg::Unnamed(unnamed_arg) => write!(f, "{}", unnamed_arg.sql(dialect)?),
         }
     }
@@ -995,7 +1083,7 @@ impl DialectDisplay for Function {
         write!(
             f,
             "{}({}{})",
-            self.name.sql(dialect)?,
+            name.sql(dialect)?,
             if self.distinct { "DISTINCT " } else { "" },
             display_comma_separated(&self.args).sql(dialect)?,
         )?;
@@ -1156,7 +1244,12 @@ pub struct SqlOption {
 
 impl DialectDisplay for SqlOption {
     fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> fmt::Result {
-        write!(f, "{} = {}", self.name.sql(dialect)?, self.value.sql(dialect)?)
+        write!(
+            f,
+            "{} = {}",
+            self.name.sql(dialect)?,
+            self.value.sql(dialect)?
+        )
     }
 }
 
@@ -1227,8 +1320,16 @@ impl DialectDisplay for ShowStatementFilter {
     fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> fmt::Result {
         use ShowStatementFilter::*;
         match self {
-            Like(pattern) => write!(f, "LIKE '{}'", value::escape_single_quote_string(pattern).sql(dialect)?),
-            ILike(pattern) => write!(f, "ILIKE {}", value::escape_single_quote_string(pattern).sql(dialect)?),
+            Like(pattern) => write!(
+                f,
+                "LIKE '{}'",
+                value::escape_single_quote_string(pattern).sql(dialect)?
+            ),
+            ILike(pattern) => write!(
+                f,
+                "ILIKE {}",
+                value::escape_single_quote_string(pattern).sql(dialect)?
+            ),
             Where(expr) => write!(f, "WHERE {}", expr.sql(dialect)?),
         }
     }
@@ -1298,7 +1399,11 @@ impl DialectDisplay for CopyTarget {
         match self {
             Stdin { .. } => write!(f, "STDIN"),
             Stdout => write!(f, "STDOUT"),
-            File { filename } => write!(f, "'{}'", value::escape_single_quote_string(filename).sql(dialect)?),
+            File { filename } => write!(
+                f,
+                "'{}'",
+                value::escape_single_quote_string(filename).sql(dialect)?
+            ),
             Program { command } => write!(
                 f,
                 "PROGRAM '{}'",
@@ -1354,17 +1459,37 @@ impl DialectDisplay for CopyOption {
             Freeze(true) => write!(f, "FREEZE"),
             Freeze(false) => write!(f, "FREEZE FALSE"),
             Delimiter(char) => write!(f, "DELIMITER '{}'", char),
-            Null(string) => write!(f, "NULL '{}'", value::escape_single_quote_string(string).sql(dialect)?),
+            Null(string) => write!(
+                f,
+                "NULL '{}'",
+                value::escape_single_quote_string(string).sql(dialect)?
+            ),
             Header(true) => write!(f, "HEADER"),
             Header(false) => write!(f, "HEADER FALSE"),
             Quote(char) => write!(f, "QUOTE '{}'", char),
             Escape(char) => write!(f, "ESCAPE '{}'", char),
-            ForceQuote(columns) => write!(f, "FORCE_QUOTE ({})", display_comma_separated(columns).sql(dialect)?),
+            ForceQuote(columns) => write!(
+                f,
+                "FORCE_QUOTE ({})",
+                display_comma_separated(columns).sql(dialect)?
+            ),
             ForceNotNull(columns) => {
-                write!(f, "FORCE_NOT_NULL ({})", display_comma_separated(columns).sql(dialect)?)
+                write!(
+                    f,
+                    "FORCE_NOT_NULL ({})",
+                    display_comma_separated(columns).sql(dialect)?
+                )
             }
-            ForceNull(columns) => write!(f, "FORCE_NULL ({})", display_comma_separated(columns).sql(dialect)?),
-            Encoding(name) => write!(f, "ENCODING '{}'", value::escape_single_quote_string(name).sql(dialect)?),
+            ForceNull(columns) => write!(
+                f,
+                "FORCE_NULL ({})",
+                display_comma_separated(columns).sql(dialect)?
+            ),
+            Encoding(name) => write!(
+                f,
+                "ENCODING '{}'",
+                value::escape_single_quote_string(name).sql(dialect)?
+            ),
         }
     }
 }
@@ -1391,7 +1516,11 @@ impl DialectDisplay for CopyLegacyOption {
         match self {
             Binary => write!(f, "BINARY"),
             Delimiter(char) => write!(f, "DELIMITER '{}'", char),
-            Null(string) => write!(f, "NULL '{}'", value::escape_single_quote_string(string).sql(dialect)?),
+            Null(string) => write!(
+                f,
+                "NULL '{}'",
+                value::escape_single_quote_string(string).sql(dialect)?
+            ),
             Csv(opts) => write!(f, "CSV {}", display_separated(opts, " ").sql(dialect)?),
         }
     }
@@ -1422,9 +1551,17 @@ impl DialectDisplay for CopyLegacyCsvOption {
             Header => write!(f, "HEADER"),
             Quote(char) => write!(f, "QUOTE '{}'", char),
             Escape(char) => write!(f, "ESCAPE '{}'", char),
-            ForceQuote(columns) => write!(f, "FORCE QUOTE {}", display_comma_separated(columns).sql(dialect)?),
+            ForceQuote(columns) => write!(
+                f,
+                "FORCE QUOTE {}",
+                display_comma_separated(columns).sql(dialect)?
+            ),
             ForceNotNull(columns) => {
-                write!(f, "FORCE NOT NULL {}", display_comma_separated(columns).sql(dialect)?)
+                write!(
+                    f,
+                    "FORCE NOT NULL {}",
+                    display_comma_separated(columns).sql(dialect)?
+                )
             }
         }
     }
@@ -1550,14 +1687,20 @@ mod tests {
             vec![Expr::Identifier(Ident::new("a"))],
             vec![Expr::Identifier(Ident::new("b"))],
         ]);
-        assert_eq!("GROUPING SETS ((a), (b))", format!("{}", grouping_sets.sql(&dialect).unwrap()));
+        assert_eq!(
+            "GROUPING SETS ((a), (b))",
+            format!("{}", grouping_sets.sql(&dialect).unwrap())
+        );
 
         // a and b in the same group
         let grouping_sets = Expr::GroupingSets(vec![vec![
             Expr::Identifier(Ident::new("a")),
             Expr::Identifier(Ident::new("b")),
         ]]);
-        assert_eq!("GROUPING SETS ((a, b))", format!("{}", grouping_sets.sql(&dialect).unwrap()));
+        assert_eq!(
+            "GROUPING SETS ((a, b))",
+            format!("{}", grouping_sets.sql(&dialect).unwrap())
+        );
 
         // (a, b) and (c, d) in different group
         let grouping_sets = Expr::GroupingSets(vec![
@@ -1587,13 +1730,19 @@ mod tests {
             Expr::Identifier(Ident::new("a")),
             Expr::Identifier(Ident::new("b")),
         ]]);
-        assert_eq!("ROLLUP ((a, b))", format!("{}", rollup.sql(&dialect).unwrap()));
+        assert_eq!(
+            "ROLLUP ((a, b))",
+            format!("{}", rollup.sql(&dialect).unwrap())
+        );
 
         let rollup = Expr::Rollup(vec![
             vec![Expr::Identifier(Ident::new("a"))],
             vec![Expr::Identifier(Ident::new("b"))],
         ]);
-        assert_eq!("ROLLUP (a, b)", format!("{}", rollup.sql(&dialect).unwrap()));
+        assert_eq!(
+            "ROLLUP (a, b)",
+            format!("{}", rollup.sql(&dialect).unwrap())
+        );
 
         let rollup = Expr::Rollup(vec![
             vec![Expr::Identifier(Ident::new("a"))],
@@ -1603,7 +1752,10 @@ mod tests {
             ],
             vec![Expr::Identifier(Ident::new("d"))],
         ]);
-        assert_eq!("ROLLUP (a, (b, c), d)", format!("{}", rollup.sql(&dialect).unwrap()));
+        assert_eq!(
+            "ROLLUP (a, (b, c), d)",
+            format!("{}", rollup.sql(&dialect).unwrap())
+        );
     }
 
     #[test]
@@ -1633,6 +1785,9 @@ mod tests {
             ],
             vec![Expr::Identifier(Ident::new("d"))],
         ]);
-        assert_eq!("CUBE (a, (b, c), d)", format!("{}", cube.sql(&dialect).unwrap()));
+        assert_eq!(
+            "CUBE (a, (b, c), d)",
+            format!("{}", cube.sql(&dialect).unwrap())
+        );
     }
 }
