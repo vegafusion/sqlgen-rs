@@ -1070,17 +1070,16 @@ pub struct Function {
 impl DialectDisplay for Function {
     fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> fmt::Result {
         let mut name = self.name.clone();
+        let mut function_dialect = dialect.clone();
         if !dialect.quote_functions {
-            // Remove quotes so we don't quote function names
-            for ident in name.0.iter_mut() {
-                ident.quote_style = None
-            }
+            // Remove quotes around function name
+            function_dialect.quote_style = None;
         }
 
         write!(
             f,
             "{}({}{})",
-            name.sql(dialect)?,
+            name.sql(&function_dialect)?,
             if self.distinct { "DISTINCT " } else { "" },
             display_comma_separated(&self.args).sql(dialect)?,
         )?;
