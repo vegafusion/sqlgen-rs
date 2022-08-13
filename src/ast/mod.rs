@@ -1029,7 +1029,7 @@ impl DialectDisplay for Function {
             return Err(fmt::Error)
         }
 
-        let fn_name: String = name.0.get(0).cloned().unwrap().value;
+        let fn_name: String = name.0.get(0).cloned().unwrap().value.to_ascii_lowercase();
 
         // Check for transform
         if let Some(tx) = dialect.function_transforms.get(&fn_name) {
