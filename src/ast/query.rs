@@ -150,16 +150,8 @@ pub struct Select {
     pub selection: Option<Expr>,
     /// GROUP BY
     pub group_by: Vec<Expr>,
-    /// CLUSTER BY (Hive)
-    pub cluster_by: Vec<Expr>,
-    /// DISTRIBUTE BY (Hive)
-    pub distribute_by: Vec<Expr>,
-    /// SORT BY (Hive)
-    pub sort_by: Vec<Expr>,
     /// HAVING
     pub having: Option<Expr>,
-    /// QUALIFY (Snowflake)
-    pub qualify: Option<Expr>,
 }
 
 impl DialectDisplay for Select {
@@ -188,28 +180,8 @@ impl DialectDisplay for Select {
         if !self.group_by.is_empty() {
             write!(f, " GROUP BY {}", display_comma_separated(&self.group_by).sql(dialect)?)?;
         }
-        if !self.cluster_by.is_empty() {
-            write!(
-                f,
-                " CLUSTER BY {}",
-                display_comma_separated(&self.cluster_by).sql(dialect)?
-            )?;
-        }
-        if !self.distribute_by.is_empty() {
-            write!(
-                f,
-                " DISTRIBUTE BY {}",
-                display_comma_separated(&self.distribute_by).sql(dialect)?
-            )?;
-        }
-        if !self.sort_by.is_empty() {
-            write!(f, " SORT BY {}", display_comma_separated(&self.sort_by).sql(dialect)?)?;
-        }
         if let Some(ref having) = self.having {
             write!(f, " HAVING {}", having.sql(dialect)?)?;
-        }
-        if let Some(ref qualify) = self.qualify {
-            write!(f, " QUALIFY {}", qualify.sql(dialect)?)?;
         }
         Ok(())
     }

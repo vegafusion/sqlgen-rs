@@ -2151,11 +2151,7 @@ impl Parser {
             lateral_views,
             selection,
             group_by,
-            cluster_by,
-            distribute_by,
-            sort_by,
             having,
-            qualify,
         })
     }
 
