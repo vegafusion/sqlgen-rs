@@ -914,6 +914,10 @@ impl Parser {
             Token::Caret => Some(BinaryOperator::BitwiseXor),
             Token::Ampersand => Some(BinaryOperator::BitwiseAnd),
             Token::Div => Some(BinaryOperator::Divide),
+            Token::Tilde => Some(BinaryOperator::PGRegexMatch),
+            Token::TildeAsterisk => Some(BinaryOperator::PGRegexIMatch),
+            Token::ExclamationMarkTilde => Some(BinaryOperator::PGRegexNotMatch),
+            Token::ExclamationMarkTildeAsterisk => Some(BinaryOperator::PGRegexNotIMatch),
             Token::Word(w) => match w.keyword {
                 Keyword::AND => Some(BinaryOperator::And),
                 Keyword::OR => Some(BinaryOperator::Or),
@@ -2091,7 +2095,31 @@ impl Parser {
             vec![]
         };
 
+        let cluster_by = if self.parse_keywords(&[Keyword::CLUSTER, Keyword::BY]) {
+            self.parse_comma_separated(Parser::parse_expr)?
+        } else {
+            vec![]
+        };
+
+        let distribute_by = if self.parse_keywords(&[Keyword::DISTRIBUTE, Keyword::BY]) {
+            self.parse_comma_separated(Parser::parse_expr)?
+        } else {
+            vec![]
+        };
+
+        let sort_by = if self.parse_keywords(&[Keyword::SORT, Keyword::BY]) {
+            self.parse_comma_separated(Parser::parse_expr)?
+        } else {
+            vec![]
+        };
+
         let having = if self.parse_keyword(Keyword::HAVING) {
+            Some(self.parse_expr()?)
+        } else {
+            None
+        };
+
+        let qualify = if self.parse_keyword(Keyword::QUALIFY) {
             Some(self.parse_expr()?)
         } else {
             None

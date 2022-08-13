@@ -80,6 +80,13 @@ pub enum BinaryOperator {
     BitwiseOr,
     BitwiseAnd,
     BitwiseXor,
+    PGBitwiseXor,
+    PGBitwiseShiftLeft,
+    PGBitwiseShiftRight,
+    PGRegexMatch,
+    PGRegexIMatch,
+    PGRegexNotMatch,
+    PGRegexNotIMatch,
 }
 
 impl DialectDisplay for BinaryOperator {
@@ -108,6 +115,13 @@ impl DialectDisplay for BinaryOperator {
             BinaryOperator::BitwiseOr => "|",
             BinaryOperator::BitwiseAnd => "&",
             BinaryOperator::BitwiseXor => "^",
+            BinaryOperator::PGBitwiseXor => "#",
+            BinaryOperator::PGBitwiseShiftLeft => "<<",
+            BinaryOperator::PGBitwiseShiftRight => ">>",
+            BinaryOperator::PGRegexMatch => "~",
+            BinaryOperator::PGRegexIMatch => "~*",
+            BinaryOperator::PGRegexNotMatch => "!~",
+            BinaryOperator::PGRegexNotIMatch => "!~*",
         })
     }
 }
