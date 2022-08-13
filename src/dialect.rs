@@ -92,6 +92,31 @@ impl Dialect {
                 "upper",
                 "regexp_match",
                 "struct",
+
+                // Aggregate functions
+                "min",
+                "max",
+                "count",
+                "avg",
+                "mean",
+                "sum",
+                "median",
+                "approx_distinct",
+                "array_agg",
+                "var",
+                "var_samp",
+                "var_pop",
+                "stddev",
+                "stddev_samp",
+                "stddev_pop",
+                "covar",
+                "covar_samp",
+                "covar_pop",
+                "corr",
+                "approx_percentile_cont",
+                "approx_percentile_cont_with_weight",
+                "approx_median",
+                "grouping",
             ].iter().map(|name| name.to_string()).collect(),
             function_transforms: Default::default(),
         }
@@ -149,7 +174,16 @@ impl Dialect {
                 "unicode",
                 "unlikely",
                 "upper",
-                "zeroblob"
+                "zeroblob",
+
+                // Aggregation
+                "avg",
+                "count",
+                "group_concat",
+                "max",
+                "min",
+                "sum",
+                "total",
             ].iter().map(|name| name.to_string()).collect(),
             function_transforms
         }
