@@ -1039,7 +1039,7 @@ impl DialectDisplay for Function {
             )?;
         } else {
             // Validate function
-            if !dialect.functions.contains(&fn_name) {
+            if !dialect.functions.is_empty() && !dialect.functions.contains(&fn_name) {
                 // Function not allowed for dialect
                 return Err(fmt::Error)
             }
