@@ -1069,7 +1069,7 @@ pub struct Function {
 
 impl DialectDisplay for Function {
     fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> fmt::Result {
-        let mut name = self.name.clone();
+        let name = self.name.clone();
         let mut function_dialect = dialect.clone();
         if !dialect.quote_functions {
             // Remove quotes around function name
