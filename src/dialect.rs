@@ -13,7 +13,7 @@ pub struct Dialect {
     pub function_transforms: HashMap<String, Arc<dyn FunctionTransform>>
 }
 
-pub trait FunctionTransform: Debug {
+pub trait FunctionTransform: Debug + Send + Sync {
     fn transform(&self, name: &str, args: &[String]) -> String;
 }
 
