@@ -1029,23 +1029,6 @@ impl Parser {
             })
         } else if Token::LBracket == tok {
             self.parse_array_index(expr)
-        } else if Token::Arrow == tok
-            || Token::LongArrow == tok
-            || Token::HashArrow == tok
-            || Token::HashLongArrow == tok
-        {
-            let operator = match tok {
-                Token::Arrow => JsonOperator::Arrow,
-                Token::LongArrow => JsonOperator::LongArrow,
-                Token::HashArrow => JsonOperator::HashArrow,
-                Token::HashLongArrow => JsonOperator::HashLongArrow,
-                _ => unreachable!(),
-            };
-            Ok(Expr::JsonAccess {
-                left: Box::new(expr),
-                operator,
-                right: Box::new(self.parse_expr()?),
-            })
         } else {
             // Can only happen if `get_next_precedence` got out of sync with this function
             parser_err!(format!("No infix parser for token {:?}", tok))

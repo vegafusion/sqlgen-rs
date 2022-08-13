@@ -168,39 +168,6 @@ impl DialectDisplay for Array {
     }
 }
 
-/// JsonOperator
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub enum JsonOperator {
-    /// -> keeps the value as json
-    Arrow,
-    /// ->> keeps the value as text or int.
-    LongArrow,
-    /// #> Extracts JSON sub-object at the specified path
-    HashArrow,
-    /// #>> Extracts JSON sub-object at the specified path as text
-    HashLongArrow,
-}
-
-impl DialectDisplay for JsonOperator {
-    fn fmt(&self, f: &mut (dyn fmt::Write), _dialect: &Dialect) -> fmt::Result {
-        match self {
-            JsonOperator::Arrow => {
-                write!(f, "->")
-            }
-            JsonOperator::LongArrow => {
-                write!(f, "->>")
-            }
-            JsonOperator::HashArrow => {
-                write!(f, "#>")
-            }
-            JsonOperator::HashLongArrow => {
-                write!(f, "#>>")
-            }
-        }
-    }
-}
-
 /// An SQL expression of any type.
 ///
 /// The parser does not distinguish between expressions of different types
@@ -213,12 +180,6 @@ pub enum Expr {
     Identifier(Ident),
     /// Multi-part identifier, e.g. `table_alias.column` or `schema.table.col`
     CompoundIdentifier(Vec<Ident>),
-    /// JSON access (postgres)  eg: data->'tags'
-    JsonAccess {
-        left: Box<Expr>,
-        operator: JsonOperator,
-        right: Box<Expr>,
-    },
     /// CompositeAccess (postgres) eg: SELECT (information_schema._pg_expandarray(array['i','i'])).n
     CompositeAccess { expr: Box<Expr>, key: Ident },
     /// `IS FALSE` operator
@@ -603,19 +564,6 @@ impl DialectDisplay for Expr {
             }
             Expr::Array(set) => {
                 write!(f, "{}", set.sql(dialect)?)
-            }
-            Expr::JsonAccess {
-                left,
-                operator,
-                right,
-            } => {
-                write!(
-                    f,
-                    "{} {} {}",
-                    left.sql(dialect)?,
-                    operator.sql(dialect)?,
-                    right.sql(dialect)?
-                )
             }
             Expr::CompositeAccess { expr, key } => {
                 write!(f, "{}.{}", expr.sql(dialect)?, key.sql(dialect)?)
