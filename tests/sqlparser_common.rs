@@ -23,7 +23,7 @@ mod test_utils;
 
 use matches::assert_matches;
 use sqlgen::ast::*;
-use sqlgen::dialect::DialectDisplay;
+use sqlgen::dialect::{Dialect, DialectDisplay};
 use sqlgen::keywords::ALL_KEYWORDS;
 use sqlgen::parser::{Parser, ParserError};
 use sqlgen::test_utils::{
@@ -2990,4 +2990,19 @@ fn parse_is_boolean() {
         ),
         res.unwrap_err()
     );
+}
+
+
+#[test]
+fn test_function_transform() {
+    let sql = "select floor(1.5) as a, ceil(2.5) from tbl";
+    let res = parse_sql_query(sql).unwrap();
+
+    let dialect = Dialect::sqlite();
+    let sqlite_query_str = res.sql(&dialect).unwrap();
+    println!("{}", sqlite_query_str);
+    assert_eq!(
+        sqlite_query_str,
+        r#"SELECT round(1.5 - 0.5) AS "a", round(2.5 + 0.5) FROM "tbl""#
+    )
 }

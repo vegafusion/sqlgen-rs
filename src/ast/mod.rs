@@ -1024,13 +1024,34 @@ impl DialectDisplay for Function {
             function_dialect.quote_style = None;
         }
 
-        write!(
-            f,
-            "{}({}{})",
-            name.sql(&function_dialect)?,
-            if self.distinct { "DISTINCT " } else { "" },
-            display_comma_separated(&self.args).sql(dialect)?,
-        )?;
+        if name.0.len() != 1 {
+            // Only single identifier functions allowed
+            return Err(fmt::Error)
+        }
+
+        let fn_name: String = name.0.get(0).cloned().unwrap().value;
+
+        // Check for transform
+        if let Some(tx) = dialect.function_transforms.get(&fn_name) {
+            let args = self.args.iter().map(|arg| arg.sql(&dialect)).collect::<Result<Vec<_>, fmt::Error>>()?;
+            write!(
+                f, "{}", tx.transform(&fn_name, args.as_slice())
+            )?;
+        } else {
+            // Validate function
+            if !dialect.functions.contains(&fn_name) {
+                // Function not allowed for dialect
+                return Err(fmt::Error)
+            }
+            write!(
+                f,
+                "{}({}{})",
+                name.sql(&function_dialect)?,
+                if self.distinct { "DISTINCT " } else { "" },
+                display_comma_separated(&self.args).sql(dialect)?,
+            )?;
+        }
+
         if let Some(o) = &self.over {
             write!(f, " OVER ({})", o.sql(dialect)?)?;
         }
