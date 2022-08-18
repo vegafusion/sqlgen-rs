@@ -212,7 +212,7 @@ impl FunctionTransform for SqLiteCeilTransform {
 struct SqLiteIsFiniteTransform;
 impl FunctionTransform for SqLiteIsFiniteTransform {
     fn transform(&self, _name: &str, args: &[String]) -> String {
-        format!("{arg} != 'NaN' AND {arg} != '-Inf' AND {arg} != 'Inf'", arg=&args[0])
+        format!("{arg} NOT IN ('NaN', '-Inf', 'Inf')", arg=&args[0])
     }
 }
 
