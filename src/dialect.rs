@@ -126,6 +126,8 @@ impl Dialect {
         let mut function_transforms: HashMap<String, Arc<dyn FunctionTransform>> = Default::default();
         function_transforms.insert("floor".to_string(), Arc::new(SqLiteFloorTransform));
         function_transforms.insert("ceil".to_string(), Arc::new(SqLiteCeilTransform));
+        function_transforms.insert("isfinite".to_string(), Arc::new(SqLiteIsFiniteTransform));
+        function_transforms.insert("isnan".to_string(), Arc::new(SqLiteIsNanTransform));
 
         Self {
             quote_style: Some('"'),
@@ -193,7 +195,7 @@ impl Dialect {
 #[derive(Clone, Debug)]
 struct SqLiteFloorTransform;
 impl FunctionTransform for SqLiteFloorTransform {
-    fn transform(&self, name: &str, args: &[String]) -> String {
+    fn transform(&self, _name: &str, args: &[String]) -> String {
         format!("round({} - 0.5)", &args[0])
     }
 }
@@ -201,11 +203,26 @@ impl FunctionTransform for SqLiteFloorTransform {
 #[derive(Clone, Debug)]
 struct SqLiteCeilTransform;
 impl FunctionTransform for SqLiteCeilTransform {
-    fn transform(&self, name: &str, args: &[String]) -> String {
+    fn transform(&self, _name: &str, args: &[String]) -> String {
         format!("round({} + 0.5)", &args[0])
     }
 }
 
+#[derive(Clone, Debug)]
+struct SqLiteIsFiniteTransform;
+impl FunctionTransform for SqLiteIsFiniteTransform {
+    fn transform(&self, _name: &str, args: &[String]) -> String {
+        format!("{arg} != 'NaN' AND {arg} != '-Inf' AND {arg} != 'Inf'", arg=&args[0])
+    }
+}
+
+#[derive(Clone, Debug)]
+struct SqLiteIsNanTransform;
+impl FunctionTransform for SqLiteIsNanTransform {
+    fn transform(&self, _name: &str, args: &[String]) -> String {
+        format!("{arg} = 'NaN'", arg=&args[0])
+    }
+}
 
 impl Default for Dialect {
     fn default() -> Self {
