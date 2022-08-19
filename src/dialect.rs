@@ -122,7 +122,7 @@ impl Dialect {
                 "row_number",
                 "rank",
                 "dense_rank",
-                "percent_rank" => BuiltInWindowFunction::PercentRank,
+                "percent_rank",
                 "cume_dist",
                 "ntile",
                 "lag",
