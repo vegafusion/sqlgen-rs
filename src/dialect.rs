@@ -117,6 +117,19 @@ impl Dialect {
                 "approx_percentile_cont_with_weight",
                 "approx_median",
                 "grouping",
+
+                // Window functions
+                "row_number",
+                "rank",
+                "dense_rank",
+                "percent_rank" => BuiltInWindowFunction::PercentRank,
+                "cume_dist",
+                "ntile",
+                "lag",
+                "lead",
+                "first_value",
+                "last_value",
+                "nth_value",
             ].iter().map(|name| name.to_string()).collect(),
             function_transforms: Default::default(),
         }
@@ -186,6 +199,19 @@ impl Dialect {
                 "min",
                 "sum",
                 "total",
+
+                // Window functions
+                "row_number",
+                "rank",
+                "dense_rank",
+                "percent_rank",
+                "cume_dist",
+                "ntile",
+                "lag",
+                "lead",
+                "first_value",
+                "last_value",
+                "nth_value",
             ].iter().map(|name| name.to_string()).collect(),
             function_transforms
         }
