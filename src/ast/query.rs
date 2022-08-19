@@ -48,7 +48,11 @@ impl DialectDisplay for Query {
         }
         write!(f, "{}", self.body.sql(dialect)?)?;
         if !self.order_by.is_empty() {
-            write!(f, " ORDER BY {}", display_comma_separated(&self.order_by).sql(dialect)?)?;
+            write!(
+                f,
+                " ORDER BY {}",
+                display_comma_separated(&self.order_by).sql(dialect)?
+            )?;
         }
         if let Some(ref limit) = self.limit {
             write!(f, " LIMIT {}", limit.sql(dialect)?)?;
@@ -100,11 +104,13 @@ impl DialectDisplay for SetExpr {
                 all,
             } => {
                 let all_str = if *all { " ALL" } else { "" };
-                Ok(write!(f, "{} {}{} {}",
-                       left.sql(dialect)?,
-                       op.sql(dialect)?,
-                       all_str,
-                       right.sql(dialect)?,
+                Ok(write!(
+                    f,
+                    "{} {}{} {}",
+                    left.sql(dialect)?,
+                    op.sql(dialect)?,
+                    all_str,
+                    right.sql(dialect)?,
                 )?)
             }
         }
@@ -160,14 +166,22 @@ impl DialectDisplay for Select {
         if let Some(ref top) = self.top {
             write!(f, " {}", top.sql(dialect)?)?;
         }
-        write!(f, " {}", display_comma_separated(&self.projection).sql(dialect)?)?;
+        write!(
+            f,
+            " {}",
+            display_comma_separated(&self.projection).sql(dialect)?
+        )?;
 
         if let Some(ref into) = self.into {
             write!(f, " {}", into.sql(dialect)?)?;
         }
 
         if !self.from.is_empty() {
-            write!(f, " FROM {}", display_comma_separated(&self.from).sql(dialect)?)?;
+            write!(
+                f,
+                " FROM {}",
+                display_comma_separated(&self.from).sql(dialect)?
+            )?;
         }
         if !self.lateral_views.is_empty() {
             for lv in &self.lateral_views {
@@ -178,7 +192,11 @@ impl DialectDisplay for Select {
             write!(f, " WHERE {}", selection.sql(dialect)?)?;
         }
         if !self.group_by.is_empty() {
-            write!(f, " GROUP BY {}", display_comma_separated(&self.group_by).sql(dialect)?)?;
+            write!(
+                f,
+                " GROUP BY {}",
+                display_comma_separated(&self.group_by).sql(dialect)?
+            )?;
         }
         if let Some(ref having) = self.having {
             write!(f, " HAVING {}", having.sql(dialect)?)?;
@@ -253,7 +271,12 @@ pub struct Cte {
 
 impl DialectDisplay for Cte {
     fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> Result<(), SqlGenError> {
-        write!(f, "{} AS ({})", self.alias.sql(dialect)?, self.query.sql(dialect)?)?;
+        write!(
+            f,
+            "{} AS ({})",
+            self.alias.sql(dialect)?,
+            self.query.sql(dialect)?
+        )?;
         if let Some(ref fr) = self.from {
             write!(f, " FROM {}", fr.sql(dialect)?)?;
         }
@@ -279,7 +302,9 @@ impl DialectDisplay for SelectItem {
     fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> Result<(), SqlGenError> {
         Ok(match &self {
             SelectItem::UnnamedExpr(expr) => write!(f, "{}", expr.sql(dialect)?),
-            SelectItem::ExprWithAlias { expr, alias } => write!(f, "{} AS {}", expr.sql(dialect)?, alias.sql(dialect)?),
+            SelectItem::ExprWithAlias { expr, alias } => {
+                write!(f, "{} AS {}", expr.sql(dialect)?, alias.sql(dialect)?)
+            }
             SelectItem::QualifiedWildcard(prefix) => write!(f, "{}.*", prefix.sql(dialect)?),
             SelectItem::Wildcard => write!(f, "*"),
         }?)
@@ -371,7 +396,11 @@ impl DialectDisplay for TableFactor {
                     write!(f, " AS {}", alias.sql(dialect)?)?;
                 }
                 if !with_hints.is_empty() {
-                    write!(f, " WITH ({})", display_comma_separated(with_hints).sql(dialect)?)?;
+                    write!(
+                        f,
+                        " WITH ({})",
+                        display_comma_separated(with_hints).sql(dialect)?
+                    )?;
                 }
                 Ok(())
             }
@@ -414,7 +443,9 @@ impl DialectDisplay for TableFactor {
                 }
                 Ok(())
             }
-            TableFactor::NestedJoin(table_reference) => Ok(write!(f, "({})", table_reference.sql(dialect)?)?),
+            TableFactor::NestedJoin(table_reference) => {
+                Ok(write!(f, "({})", table_reference.sql(dialect)?)?)
+            }
         }
     }
 }
@@ -430,7 +461,11 @@ impl DialectDisplay for TableAlias {
     fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> Result<(), SqlGenError> {
         write!(f, "{}", self.name.sql(dialect)?)?;
         if !self.columns.is_empty() {
-            write!(f, " ({})", display_comma_separated(&self.columns).sql(dialect)?)?;
+            write!(
+                f,
+                " ({})",
+                display_comma_separated(&self.columns).sql(dialect)?
+            )?;
         }
         Ok(())
     }
@@ -451,15 +486,21 @@ impl DialectDisplay for Join {
                 _ => "",
             }
         }
-        fn suffix(constraint: &'_ JoinConstraint, dialect: &Dialect) -> Result<String, SqlGenError> {
-
+        fn suffix(
+            constraint: &'_ JoinConstraint,
+            dialect: &Dialect,
+        ) -> Result<String, SqlGenError> {
             let mut repr = String::new();
             match constraint {
                 JoinConstraint::On(expr) => {
                     write!(repr, " ON {}", expr.sql(dialect)?)?;
                 }
                 JoinConstraint::Using(attrs) => {
-                    write!(repr, " USING({})", display_comma_separated(attrs).sql(dialect)?)?;
+                    write!(
+                        repr,
+                        " USING({})",
+                        display_comma_separated(attrs).sql(dialect)?
+                    )?;
                 }
                 _ => {}
             }
@@ -561,7 +602,12 @@ pub struct Offset {
 
 impl DialectDisplay for Offset {
     fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> Result<(), SqlGenError> {
-        Ok(write!(f, "OFFSET {}{}", self.value.sql(dialect)?, self.rows.sql(dialect)?)?)
+        Ok(write!(
+            f,
+            "OFFSET {}{}",
+            self.value.sql(dialect)?,
+            self.rows.sql(dialect)?
+        )?)
     }
 }
 
@@ -598,7 +644,13 @@ impl DialectDisplay for Fetch {
         let extension = if self.with_ties { "WITH TIES" } else { "ONLY" };
         Ok(if let Some(ref quantity) = self.quantity {
             let percent = if self.percent { " PERCENT" } else { "" };
-            write!(f, "FETCH FIRST {}{} ROWS {}", quantity.sql(dialect)?, percent, extension)
+            write!(
+                f,
+                "FETCH FIRST {}{} ROWS {}",
+                quantity.sql(dialect)?,
+                percent,
+                extension
+            )
         } else {
             write!(f, "FETCH FIRST ROWS {}", extension)
         }?)
@@ -636,7 +688,13 @@ impl DialectDisplay for Top {
         let extension = if self.with_ties { " WITH TIES" } else { "" };
         Ok(if let Some(ref quantity) = self.quantity {
             let percent = if self.percent { " PERCENT" } else { "" };
-            write!(f, "TOP ({}){}{}", quantity.sql(dialect)?, percent, extension)
+            write!(
+                f,
+                "TOP ({}){}{}",
+                quantity.sql(dialect)?,
+                percent,
+                extension
+            )
         } else {
             write!(f, "TOP{}", extension)
         }?)
@@ -675,6 +733,13 @@ impl DialectDisplay for SelectInto {
         let unlogged = if self.unlogged { " UNLOGGED" } else { "" };
         let table = if self.table { " TABLE" } else { "" };
 
-        Ok(write!(f, "INTO{}{}{} {}", temporary, unlogged, table, self.name.sql(dialect)?)?)
+        Ok(write!(
+            f,
+            "INTO{}{}{} {}",
+            temporary,
+            unlogged,
+            table,
+            self.name.sql(dialect)?
+        )?)
     }
 }

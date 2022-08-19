@@ -104,7 +104,9 @@ pub enum DataType {
 impl DialectDisplay for DataType {
     fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> Result<(), SqlGenError> {
         match self {
-            DataType::Char(size) => format_type_with_optional_length(f, dialect, "CHAR", size, false),
+            DataType::Char(size) => {
+                format_type_with_optional_length(f, dialect, "CHAR", size, false)
+            }
             DataType::Varchar(size) => {
                 format_type_with_optional_length(f, dialect, "CHARACTER VARYING", size, false)
             }
@@ -123,7 +125,9 @@ impl DialectDisplay for DataType {
                     format_type_with_optional_length(f, dialect, "NUMERIC", precision, false)
                 }
             }
-            DataType::Float(size) => format_type_with_optional_length(f, dialect, "FLOAT", size, false),
+            DataType::Float(size) => {
+                format_type_with_optional_length(f, dialect, "FLOAT", size, false)
+            }
             DataType::TinyInt(zerofill) => {
                 format_type_with_optional_length(f, dialect, "TINYINT", zerofill, false)
             }
@@ -136,7 +140,9 @@ impl DialectDisplay for DataType {
             DataType::UnsignedSmallInt(zerofill) => {
                 format_type_with_optional_length(f, dialect, "SMALLINT", zerofill, true)
             }
-            DataType::Int(zerofill) => format_type_with_optional_length(f, dialect, "INT", zerofill, false),
+            DataType::Int(zerofill) => {
+                format_type_with_optional_length(f, dialect, "INT", zerofill, false)
+            }
             DataType::UnsignedInt(zerofill) => {
                 format_type_with_optional_length(f, dialect, "INT", zerofill, true)
             }

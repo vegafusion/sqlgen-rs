@@ -25,9 +25,9 @@ use alloc::{
 use core::fmt;
 
 use crate::dialect::{Dialect, DialectDisplay};
+use crate::parser::SqlGenError;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use crate::parser::SqlGenError;
 
 pub use self::data_type::DataType;
 pub use self::operator::{BinaryOperator, UnaryOperator};
@@ -142,7 +142,11 @@ pub struct ObjectName(pub Vec<Ident>);
 
 impl DialectDisplay for ObjectName {
     fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> Result<(), SqlGenError> {
-        Ok(write!(f, "{}", display_separated(&self.0, ".").sql(dialect)?)?)
+        Ok(write!(
+            f,
+            "{}",
+            display_separated(&self.0, ".").sql(dialect)?
+        )?)
     }
 }
 
@@ -1027,24 +1031,30 @@ impl DialectDisplay for Function {
 
         if name.0.len() != 1 {
             // Only single identifier functions allowed
-            return Err(SqlGenError::DialectError(
-                format!("Namespace qualified functions are not supported: {}", name.sql(dialect)?)
-            ))
+            return Err(SqlGenError::DialectError(format!(
+                "Namespace qualified functions are not supported: {}",
+                name.sql(dialect)?
+            )));
         }
 
         let fn_name: String = name.0.get(0).cloned().unwrap().value.to_ascii_lowercase();
 
         // Check for transform
         if let Some(tx) = dialect.function_transforms.get(&fn_name) {
-            let args = self.args.iter().map(|arg| arg.sql(&dialect)).collect::<Result<Vec<_>, SqlGenError>>()?;
-            write!(
-                f, "{}", tx.transform(&fn_name, args.as_slice())
-            )?;
+            let args = self
+                .args
+                .iter()
+                .map(|arg| arg.sql(&dialect))
+                .collect::<Result<Vec<_>, SqlGenError>>()?;
+            write!(f, "{}", tx.transform(&fn_name, args.as_slice()))?;
         } else {
             // Validate function
             if !dialect.functions.is_empty() && !dialect.functions.contains(&fn_name) {
                 // Function not allowed for dialect
-                return Err(SqlGenError::DialectError(format!("Function {} is not supported by dialect", fn_name)))
+                return Err(SqlGenError::DialectError(format!(
+                    "Function {} is not supported by dialect",
+                    fn_name
+                )));
             }
             write!(
                 f,

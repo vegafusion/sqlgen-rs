@@ -1,8 +1,8 @@
+use crate::parser::SqlGenError;
 use core::fmt::Debug;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::sync::Arc;
-use crate::parser::SqlGenError;
 
 #[derive(Clone, Debug)]
 pub struct Dialect {
@@ -11,7 +11,7 @@ pub struct Dialect {
     pub quote_style: Option<char>,
     pub quote_functions: bool,
     pub functions: HashSet<String>,
-    pub function_transforms: HashMap<String, Arc<dyn FunctionTransform>>
+    pub function_transforms: HashMap<String, Arc<dyn FunctionTransform>>,
 }
 
 pub trait FunctionTransform: Debug + Send + Sync {
@@ -93,7 +93,6 @@ impl Dialect {
                 "upper",
                 "regexp_match",
                 "struct",
-
                 // Aggregate functions
                 "min",
                 "max",
@@ -118,7 +117,6 @@ impl Dialect {
                 "approx_percentile_cont_with_weight",
                 "approx_median",
                 "grouping",
-
                 // Window functions
                 "row_number",
                 "rank",
@@ -131,13 +129,17 @@ impl Dialect {
                 "first_value",
                 "last_value",
                 "nth_value",
-            ].iter().map(|name| name.to_string()).collect(),
+            ]
+            .iter()
+            .map(|name| name.to_string())
+            .collect(),
             function_transforms: Default::default(),
         }
     }
 
     pub fn sqlite() -> Self {
-        let mut function_transforms: HashMap<String, Arc<dyn FunctionTransform>> = Default::default();
+        let mut function_transforms: HashMap<String, Arc<dyn FunctionTransform>> =
+            Default::default();
         function_transforms.insert("floor".to_string(), Arc::new(SqLiteFloorTransform));
         function_transforms.insert("ceil".to_string(), Arc::new(SqLiteCeilTransform));
         function_transforms.insert("isfinite".to_string(), Arc::new(SqLiteIsFiniteTransform));
@@ -191,7 +193,6 @@ impl Dialect {
                 "unlikely",
                 "upper",
                 "zeroblob",
-
                 // Aggregation
                 "avg",
                 "count",
@@ -200,7 +201,6 @@ impl Dialect {
                 "min",
                 "sum",
                 "total",
-
                 // Window functions
                 "row_number",
                 "rank",
@@ -213,8 +213,11 @@ impl Dialect {
                 "first_value",
                 "last_value",
                 "nth_value",
-            ].iter().map(|name| name.to_string()).collect(),
-            function_transforms
+            ]
+            .iter()
+            .map(|name| name.to_string())
+            .collect(),
+            function_transforms,
         }
     }
 }
@@ -239,7 +242,7 @@ impl FunctionTransform for SqLiteCeilTransform {
 struct SqLiteIsFiniteTransform;
 impl FunctionTransform for SqLiteIsFiniteTransform {
     fn transform(&self, _name: &str, args: &[String]) -> String {
-        format!("{arg} NOT IN ('NaN', '-Inf', 'Inf')", arg=&args[0])
+        format!("{arg} NOT IN ('NaN', '-Inf', 'Inf')", arg = &args[0])
     }
 }
 
@@ -247,7 +250,7 @@ impl FunctionTransform for SqLiteIsFiniteTransform {
 struct SqLiteIsNanTransform;
 impl FunctionTransform for SqLiteIsNanTransform {
     fn transform(&self, _name: &str, args: &[String]) -> String {
-        format!("{arg} = 'NaN'", arg=&args[0])
+        format!("{arg} = 'NaN'", arg = &args[0])
     }
 }
 

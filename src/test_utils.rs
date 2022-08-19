@@ -86,7 +86,11 @@ pub fn verified_only_select(query: &str) -> Select {
 /// after a serialization round-trip.
 pub fn verified_expr(sql: &str) -> Expr {
     let ast = run_parser_method(sql, |parser| parser.parse_expr()).unwrap();
-    assert_eq!(sql, &ast.sql(&Default::default()).unwrap(), "round-tripping without changes");
+    assert_eq!(
+        sql,
+        &ast.sql(&Default::default()).unwrap(),
+        "round-tripping without changes"
+    );
     ast
 }
 

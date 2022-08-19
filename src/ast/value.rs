@@ -16,12 +16,12 @@ use alloc::boxed::Box;
 use alloc::string::String;
 use core::fmt;
 
+use crate::dialect::{Dialect, DialectDisplay};
+use crate::parser::SqlGenError;
 #[cfg(feature = "bigdecimal")]
 use bigdecimal::BigDecimal;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use crate::dialect::{Dialect, DialectDisplay};
-use crate::parser::SqlGenError;
 
 use super::Expr;
 
@@ -77,8 +77,12 @@ impl DialectDisplay for Value {
         Ok(match self {
             Value::Number(v, l) => write!(f, "{}{long}", v, long = if *l { "L" } else { "" }),
             Value::DoubleQuotedString(v) => write!(f, "\"{}\"", v),
-            Value::SingleQuotedString(v) => write!(f, "'{}'", escape_single_quote_string(v).sql(dialect)?),
-            Value::EscapedStringLiteral(v) => write!(f, "E'{}'", escape_escaped_string(v).sql(dialect)?),
+            Value::SingleQuotedString(v) => {
+                write!(f, "'{}'", escape_single_quote_string(v).sql(dialect)?)
+            }
+            Value::EscapedStringLiteral(v) => {
+                write!(f, "E'{}'", escape_escaped_string(v).sql(dialect)?)
+            }
             Value::NationalStringLiteral(v) => write!(f, "N'{}'", v),
             Value::HexStringLiteral(v) => write!(f, "X'{}'", v),
             Value::Boolean(v) => write!(f, "{}", v),
@@ -95,7 +99,9 @@ impl DialectDisplay for Value {
                 write!(
                     f,
                     "INTERVAL {} SECOND ({}, {})",
-                    value.sql(dialect)?, leading_precision, fractional_seconds_precision
+                    value.sql(dialect)?,
+                    leading_precision,
+                    fractional_seconds_precision
                 )
             }
             Value::Interval {

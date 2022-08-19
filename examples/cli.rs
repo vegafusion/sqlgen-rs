@@ -50,10 +50,7 @@ $ cargo run --feature json_example --example cli FILENAME.sql [--dialectname]
     let dialect: Dialect = Default::default();
     match parse_result {
         Ok(query) => {
-            println!(
-                "Round-trip:\n'{}'",
-                query.sql(&dialect).unwrap()
-            );
+            println!("Round-trip:\n'{}'", query.sql(&dialect).unwrap());
 
             if cfg!(feature = "json_example") {
                 #[cfg(feature = "json_example")]

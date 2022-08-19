@@ -2992,7 +2992,6 @@ fn parse_is_boolean() {
     );
 }
 
-
 #[test]
 fn test_function_transform() {
     let sql = "select floor(1.5) as a, ceil(2.5) from tbl";

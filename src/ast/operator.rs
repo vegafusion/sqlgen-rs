@@ -12,10 +12,10 @@
 
 use core::fmt;
 
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
 use crate::dialect::{Dialect, DialectDisplay};
 use crate::parser::SqlGenError;
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 
 /// Unary operators
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

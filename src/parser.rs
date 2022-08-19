@@ -72,8 +72,8 @@ pub enum IsLateral {
     NotLateral,
 }
 
-use IsLateral::*;
 use crate::dialect::DialectDisplay;
+use IsLateral::*;
 
 pub enum WildcardExpr {
     Expr(Expr),
