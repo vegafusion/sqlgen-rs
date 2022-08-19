@@ -27,6 +27,7 @@ use core::fmt;
 use crate::dialect::{Dialect, DialectDisplay};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
+use crate::parser::SqlGenError;
 
 pub use self::data_type::DataType;
 pub use self::operator::{BinaryOperator, UnaryOperator};
@@ -49,7 +50,7 @@ impl<'a, T> DialectDisplay for DisplaySeparated<'a, T>
 where
     T: DialectDisplay,
 {
-    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> fmt::Result {
+    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> Result<(), SqlGenError> {
         let mut delim = "";
         for t in self.slice {
             write!(f, "{}", delim)?;
@@ -121,8 +122,8 @@ impl From<&str> for Ident {
 }
 
 impl DialectDisplay for Ident {
-    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> fmt::Result {
-        match dialect.quote_style {
+    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> Result<(), SqlGenError> {
+        Ok(match dialect.quote_style {
             Some(q) if q == '"' || q == '\'' || q == '`' => {
                 let escaped = value::escape_quoted_string(&self.value, q);
                 write!(f, "{}{}{}", q, escaped.sql(dialect)?, q)
@@ -130,7 +131,7 @@ impl DialectDisplay for Ident {
             Some(q) if q == '[' => write!(f, "[{}]", self.value),
             None => f.write_str(&self.value),
             _ => panic!("unexpected quote style"),
-        }
+        }?)
     }
 }
 
@@ -140,8 +141,8 @@ impl DialectDisplay for Ident {
 pub struct ObjectName(pub Vec<Ident>);
 
 impl DialectDisplay for ObjectName {
-    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> fmt::Result {
-        write!(f, "{}", display_separated(&self.0, ".").sql(dialect)?)
+    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> Result<(), SqlGenError> {
+        Ok(write!(f, "{}", display_separated(&self.0, ".").sql(dialect)?)?)
     }
 }
 
@@ -158,13 +159,13 @@ pub struct Array {
 }
 
 impl DialectDisplay for Array {
-    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> fmt::Result {
-        write!(
+    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> Result<(), SqlGenError> {
+        Ok(write!(
             f,
             "{}[{}]",
             if self.named { "ARRAY" } else { "" },
             display_comma_separated(&self.elem).sql(dialect)?
-        )
+        )?)
     }
 }
 
@@ -322,8 +323,8 @@ pub enum Expr {
 }
 
 impl DialectDisplay for Expr {
-    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> fmt::Result {
-        match self {
+    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> Result<(), SqlGenError> {
+        Ok(match self {
             Expr::Identifier(s) => write!(f, "{}", s.sql(dialect)?),
             Expr::MapAccess { column, keys } => {
                 write!(f, "{}", column.sql(dialect)?)?;
@@ -579,7 +580,7 @@ impl DialectDisplay for Expr {
                     time_zone
                 )
             }
-        }
+        }?)
     }
 }
 
@@ -593,7 +594,7 @@ pub struct WindowSpec {
 }
 
 impl DialectDisplay for WindowSpec {
-    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> fmt::Result {
+    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> Result<(), SqlGenError> {
         let mut delim = "";
         if !self.partition_by.is_empty() {
             delim = " ";
@@ -674,12 +675,12 @@ pub enum WindowFrameUnits {
 }
 
 impl DialectDisplay for WindowFrameUnits {
-    fn fmt(&self, f: &mut (dyn fmt::Write), _dialect: &Dialect) -> fmt::Result {
-        f.write_str(match self {
+    fn fmt(&self, f: &mut (dyn fmt::Write), _dialect: &Dialect) -> Result<(), SqlGenError> {
+        Ok(f.write_str(match self {
             WindowFrameUnits::Rows => "ROWS",
             WindowFrameUnits::Range => "RANGE",
             WindowFrameUnits::Groups => "GROUPS",
-        })
+        })?)
     }
 }
 
@@ -696,14 +697,14 @@ pub enum WindowFrameBound {
 }
 
 impl DialectDisplay for WindowFrameBound {
-    fn fmt(&self, f: &mut (dyn fmt::Write), _dialect: &Dialect) -> fmt::Result {
-        match self {
+    fn fmt(&self, f: &mut (dyn fmt::Write), _dialect: &Dialect) -> Result<(), SqlGenError> {
+        Ok(match self {
             WindowFrameBound::CurrentRow => f.write_str("CURRENT ROW"),
             WindowFrameBound::Preceding(None) => f.write_str("UNBOUNDED PRECEDING"),
             WindowFrameBound::Following(None) => f.write_str("UNBOUNDED FOLLOWING"),
             WindowFrameBound::Preceding(Some(n)) => write!(f, "{} PRECEDING", n),
             WindowFrameBound::Following(Some(n)) => write!(f, "{} FOLLOWING", n),
-        }
+        }?)
     }
 }
 
@@ -716,12 +717,12 @@ pub enum AddDropSync {
 }
 
 impl DialectDisplay for AddDropSync {
-    fn fmt(&self, f: &mut (dyn fmt::Write), _dialect: &Dialect) -> fmt::Result {
-        match self {
+    fn fmt(&self, f: &mut (dyn fmt::Write), _dialect: &Dialect) -> Result<(), SqlGenError> {
+        Ok(match self {
             AddDropSync::SYNC => f.write_str("SYNC PARTITIONS"),
             AddDropSync::DROP => f.write_str("DROP PARTITIONS"),
             AddDropSync::ADD => f.write_str("ADD PARTITIONS"),
-        }
+        }?)
     }
 }
 
@@ -737,15 +738,15 @@ pub enum ShowCreateObject {
 }
 
 impl DialectDisplay for ShowCreateObject {
-    fn fmt(&self, f: &mut (dyn fmt::Write), _dialect: &Dialect) -> fmt::Result {
-        match self {
+    fn fmt(&self, f: &mut (dyn fmt::Write), _dialect: &Dialect) -> Result<(), SqlGenError> {
+        Ok(match self {
             ShowCreateObject::Event => f.write_str("EVENT"),
             ShowCreateObject::Function => f.write_str("FUNCTION"),
             ShowCreateObject::Procedure => f.write_str("PROCEDURE"),
             ShowCreateObject::Table => f.write_str("TABLE"),
             ShowCreateObject::Trigger => f.write_str("TRIGGER"),
             ShowCreateObject::View => f.write_str("VIEW"),
-        }
+        }?)
     }
 }
 
@@ -757,11 +758,11 @@ pub enum CommentObject {
 }
 
 impl DialectDisplay for CommentObject {
-    fn fmt(&self, f: &mut (dyn fmt::Write), _dialect: &Dialect) -> fmt::Result {
-        match self {
+    fn fmt(&self, f: &mut (dyn fmt::Write), _dialect: &Dialect) -> Result<(), SqlGenError> {
+        Ok(match self {
             CommentObject::Column => f.write_str("COLUMN"),
             CommentObject::Table => f.write_str("TABLE"),
-        }
+        }?)
     }
 }
 
@@ -788,7 +789,7 @@ pub enum FetchDirection {
 }
 
 impl DialectDisplay for FetchDirection {
-    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> fmt::Result {
+    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> Result<(), SqlGenError> {
         match self {
             FetchDirection::Count { limit } => f.write_str(&limit.sql(dialect)?)?,
             FetchDirection::Next => f.write_str("NEXT")?,
@@ -847,7 +848,7 @@ pub enum Action {
 }
 
 impl DialectDisplay for Action {
-    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> fmt::Result {
+    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> Result<(), SqlGenError> {
         match self {
             Action::Connect => f.write_str("CONNECT")?,
             Action::Create => f.write_str("CREATE")?,
@@ -894,8 +895,8 @@ pub enum GrantObjects {
 }
 
 impl DialectDisplay for GrantObjects {
-    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> fmt::Result {
-        match self {
+    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> Result<(), SqlGenError> {
+        Ok(match self {
             GrantObjects::Sequences(sequences) => {
                 write!(
                     f,
@@ -927,7 +928,7 @@ impl DialectDisplay for GrantObjects {
                     display_comma_separated(schemas).sql(dialect)?
                 )
             }
-        }
+        }?)
     }
 }
 
@@ -940,13 +941,13 @@ pub struct Assignment {
 }
 
 impl DialectDisplay for Assignment {
-    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> fmt::Result {
-        write!(
+    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> Result<(), SqlGenError> {
+        Ok(write!(
             f,
             "{} = {}",
             display_separated(&self.id, ".").sql(dialect)?,
             self.value.sql(dialect)?
-        )
+        )?)
     }
 }
 
@@ -961,12 +962,12 @@ pub enum FunctionArgExpr {
 }
 
 impl DialectDisplay for FunctionArgExpr {
-    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> fmt::Result {
-        match self {
+    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> Result<(), SqlGenError> {
+        Ok(match self {
             FunctionArgExpr::Expr(expr) => write!(f, "{}", expr.sql(dialect)?),
             FunctionArgExpr::QualifiedWildcard(prefix) => write!(f, "{}.*", prefix.sql(dialect)?),
             FunctionArgExpr::Wildcard => f.write_str("*"),
-        }
+        }?)
     }
 }
 
@@ -978,13 +979,13 @@ pub enum FunctionArg {
 }
 
 impl DialectDisplay for FunctionArg {
-    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> fmt::Result {
-        match self {
+    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> Result<(), SqlGenError> {
+        Ok(match self {
             FunctionArg::Named { name, arg } => {
                 write!(f, "{} => {}", name.sql(dialect)?, arg.sql(dialect)?)
             }
             FunctionArg::Unnamed(unnamed_arg) => write!(f, "{}", unnamed_arg.sql(dialect)?),
-        }
+        }?)
     }
 }
 
@@ -996,11 +997,11 @@ pub enum CloseCursor {
 }
 
 impl DialectDisplay for CloseCursor {
-    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> fmt::Result {
-        match self {
+    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> Result<(), SqlGenError> {
+        Ok(match self {
             CloseCursor::All => write!(f, "ALL"),
             CloseCursor::Specific { name } => write!(f, "{}", name.sql(dialect)?),
-        }
+        }?)
     }
 }
 
@@ -1016,7 +1017,7 @@ pub struct Function {
 }
 
 impl DialectDisplay for Function {
-    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> fmt::Result {
+    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> Result<(), SqlGenError> {
         let mut name = self.name.clone();
         let mut function_dialect = dialect.clone();
         if !dialect.quote_functions {
@@ -1026,14 +1027,16 @@ impl DialectDisplay for Function {
 
         if name.0.len() != 1 {
             // Only single identifier functions allowed
-            return Err(fmt::Error)
+            return Err(SqlGenError::DialectError(
+                format!("Namespace qualified functions are not supported: {}", name.sql(dialect)?)
+            ))
         }
 
         let fn_name: String = name.0.get(0).cloned().unwrap().value.to_ascii_lowercase();
 
         // Check for transform
         if let Some(tx) = dialect.function_transforms.get(&fn_name) {
-            let args = self.args.iter().map(|arg| arg.sql(&dialect)).collect::<Result<Vec<_>, fmt::Error>>()?;
+            let args = self.args.iter().map(|arg| arg.sql(&dialect)).collect::<Result<Vec<_>, SqlGenError>>()?;
             write!(
                 f, "{}", tx.transform(&fn_name, args.as_slice())
             )?;
@@ -1041,7 +1044,7 @@ impl DialectDisplay for Function {
             // Validate function
             if !dialect.functions.is_empty() && !dialect.functions.contains(&fn_name) {
                 // Function not allowed for dialect
-                return Err(fmt::Error)
+                return Err(SqlGenError::DialectError(format!("Function {} is not supported by dialect", fn_name)))
             }
             write!(
                 f,
@@ -1073,9 +1076,9 @@ pub enum FileFormat {
 }
 
 impl DialectDisplay for FileFormat {
-    fn fmt(&self, f: &mut (dyn fmt::Write), _dialect: &Dialect) -> fmt::Result {
+    fn fmt(&self, f: &mut (dyn fmt::Write), _dialect: &Dialect) -> Result<(), SqlGenError> {
         use self::FileFormat::*;
-        f.write_str(match self {
+        Ok(f.write_str(match self {
             TEXTFILE => "TEXTFILE",
             SEQUENCEFILE => "SEQUENCEFILE",
             ORC => "ORC",
@@ -1083,7 +1086,7 @@ impl DialectDisplay for FileFormat {
             AVRO => "AVRO",
             RCFILE => "RCFILE",
             JSONFILE => "JSONFILE",
-        })
+        })?)
     }
 }
 
@@ -1100,7 +1103,7 @@ pub struct ListAgg {
 }
 
 impl DialectDisplay for ListAgg {
-    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> fmt::Result {
+    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> Result<(), SqlGenError> {
         write!(
             f,
             "LISTAGG({}{}",
@@ -1140,9 +1143,9 @@ pub enum ListAggOnOverflow {
 }
 
 impl DialectDisplay for ListAggOnOverflow {
-    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> fmt::Result {
+    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> Result<(), SqlGenError> {
         write!(f, " ON OVERFLOW")?;
-        match self {
+        Ok(match self {
             ListAggOnOverflow::Error => write!(f, " ERROR"),
             ListAggOnOverflow::Truncate { filler, with_count } => {
                 write!(f, " TRUNCATE")?;
@@ -1156,7 +1159,7 @@ impl DialectDisplay for ListAggOnOverflow {
                 }
                 write!(f, " COUNT")
             }
-        }
+        }?)
     }
 }
 
@@ -1170,13 +1173,13 @@ pub enum ObjectType {
 }
 
 impl DialectDisplay for ObjectType {
-    fn fmt(&self, f: &mut (dyn fmt::Write), _dialect: &Dialect) -> fmt::Result {
-        f.write_str(match self {
+    fn fmt(&self, f: &mut (dyn fmt::Write), _dialect: &Dialect) -> Result<(), SqlGenError> {
+        Ok(f.write_str(match self {
             ObjectType::Table => "TABLE",
             ObjectType::View => "VIEW",
             ObjectType::Index => "INDEX",
             ObjectType::Schema => "SCHEMA",
-        })
+        })?)
     }
 }
 
@@ -1189,14 +1192,14 @@ pub enum KillType {
 }
 
 impl DialectDisplay for KillType {
-    fn fmt(&self, f: &mut (dyn fmt::Write), _dialect: &Dialect) -> fmt::Result {
-        f.write_str(match self {
+    fn fmt(&self, f: &mut (dyn fmt::Write), _dialect: &Dialect) -> Result<(), SqlGenError> {
+        Ok(f.write_str(match self {
             // MySQL
             KillType::Connection => "CONNECTION",
             KillType::Query => "QUERY",
             // Clickhouse supports Mutation
             KillType::Mutation => "MUTATION",
-        })
+        })?)
     }
 }
 
@@ -1208,13 +1211,13 @@ pub struct SqlOption {
 }
 
 impl DialectDisplay for SqlOption {
-    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> fmt::Result {
-        write!(
+    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> Result<(), SqlGenError> {
+        Ok(write!(
             f,
             "{} = {}",
             self.name.sql(dialect)?,
             self.value.sql(dialect)?
-        )
+        )?)
     }
 }
 
@@ -1226,12 +1229,12 @@ pub enum TransactionMode {
 }
 
 impl DialectDisplay for TransactionMode {
-    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> fmt::Result {
+    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> Result<(), SqlGenError> {
         use TransactionMode::*;
-        match self {
+        Ok(match self {
             AccessMode(access_mode) => write!(f, "{}", access_mode.sql(dialect)?),
             IsolationLevel(iso_level) => write!(f, "ISOLATION LEVEL {}", iso_level.sql(dialect)?),
-        }
+        }?)
     }
 }
 
@@ -1243,12 +1246,12 @@ pub enum TransactionAccessMode {
 }
 
 impl DialectDisplay for TransactionAccessMode {
-    fn fmt(&self, f: &mut (dyn fmt::Write), _dialect: &Dialect) -> fmt::Result {
+    fn fmt(&self, f: &mut (dyn fmt::Write), _dialect: &Dialect) -> Result<(), SqlGenError> {
         use TransactionAccessMode::*;
-        f.write_str(match self {
+        Ok(f.write_str(match self {
             ReadOnly => "READ ONLY",
             ReadWrite => "READ WRITE",
-        })
+        })?)
     }
 }
 
@@ -1262,14 +1265,14 @@ pub enum TransactionIsolationLevel {
 }
 
 impl DialectDisplay for TransactionIsolationLevel {
-    fn fmt(&self, f: &mut (dyn fmt::Write), _dialect: &Dialect) -> fmt::Result {
+    fn fmt(&self, f: &mut (dyn fmt::Write), _dialect: &Dialect) -> Result<(), SqlGenError> {
         use TransactionIsolationLevel::*;
-        f.write_str(match self {
+        Ok(f.write_str(match self {
             ReadUncommitted => "READ UNCOMMITTED",
             ReadCommitted => "READ COMMITTED",
             RepeatableRead => "REPEATABLE READ",
             Serializable => "SERIALIZABLE",
-        })
+        })?)
     }
 }
 
@@ -1282,9 +1285,9 @@ pub enum ShowStatementFilter {
 }
 
 impl DialectDisplay for ShowStatementFilter {
-    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> fmt::Result {
+    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> Result<(), SqlGenError> {
         use ShowStatementFilter::*;
-        match self {
+        Ok(match self {
             Like(pattern) => write!(
                 f,
                 "LIKE '{}'",
@@ -1296,7 +1299,7 @@ impl DialectDisplay for ShowStatementFilter {
                 value::escape_single_quote_string(pattern).sql(dialect)?
             ),
             Where(expr) => write!(f, "WHERE {}", expr.sql(dialect)?),
-        }
+        }?)
     }
 }
 
@@ -1308,12 +1311,12 @@ pub enum SetVariableValue {
 }
 
 impl DialectDisplay for SetVariableValue {
-    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> fmt::Result {
+    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> Result<(), SqlGenError> {
         use SetVariableValue::*;
-        match self {
+        Ok(match self {
             Ident(ident) => write!(f, "{}", ident.sql(dialect)?),
             Literal(literal) => write!(f, "{}", literal.sql(dialect)?),
-        }
+        }?)
     }
 }
 
@@ -1331,15 +1334,15 @@ pub enum SqliteOnConflict {
 }
 
 impl DialectDisplay for SqliteOnConflict {
-    fn fmt(&self, f: &mut (dyn fmt::Write), _dialect: &Dialect) -> fmt::Result {
+    fn fmt(&self, f: &mut (dyn fmt::Write), _dialect: &Dialect) -> Result<(), SqlGenError> {
         use SqliteOnConflict::*;
-        match self {
+        Ok(match self {
             Rollback => write!(f, "ROLLBACK"),
             Abort => write!(f, "ABORT"),
             Fail => write!(f, "FAIL"),
             Ignore => write!(f, "IGNORE"),
             Replace => write!(f, "REPLACE"),
-        }
+        }?)
     }
 }
 
@@ -1359,9 +1362,9 @@ pub enum CopyTarget {
 }
 
 impl DialectDisplay for CopyTarget {
-    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> fmt::Result {
+    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> Result<(), SqlGenError> {
         use CopyTarget::*;
-        match self {
+        Ok(match self {
             Stdin { .. } => write!(f, "STDIN"),
             Stdout => write!(f, "STDOUT"),
             File { filename } => write!(
@@ -1374,7 +1377,7 @@ impl DialectDisplay for CopyTarget {
                 "PROGRAM '{}'",
                 value::escape_single_quote_string(command).sql(dialect)?
             ),
-        }
+        }?)
     }
 }
 
@@ -1417,9 +1420,9 @@ pub enum CopyOption {
 }
 
 impl DialectDisplay for CopyOption {
-    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> fmt::Result {
+    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> Result<(), SqlGenError> {
         use CopyOption::*;
-        match self {
+        Ok(match self {
             Format(name) => write!(f, "FORMAT {}", name.sql(dialect)?),
             Freeze(true) => write!(f, "FREEZE"),
             Freeze(false) => write!(f, "FREEZE FALSE"),
@@ -1455,7 +1458,7 @@ impl DialectDisplay for CopyOption {
                 "ENCODING '{}'",
                 value::escape_single_quote_string(name).sql(dialect)?
             ),
-        }
+        }?)
     }
 }
 
@@ -1476,9 +1479,9 @@ pub enum CopyLegacyOption {
 }
 
 impl DialectDisplay for CopyLegacyOption {
-    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> fmt::Result {
+    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> Result<(), SqlGenError> {
         use CopyLegacyOption::*;
-        match self {
+        Ok(match self {
             Binary => write!(f, "BINARY"),
             Delimiter(char) => write!(f, "DELIMITER '{}'", char),
             Null(string) => write!(
@@ -1487,7 +1490,7 @@ impl DialectDisplay for CopyLegacyOption {
                 value::escape_single_quote_string(string).sql(dialect)?
             ),
             Csv(opts) => write!(f, "CSV {}", display_separated(opts, " ").sql(dialect)?),
-        }
+        }?)
     }
 }
 
@@ -1510,9 +1513,9 @@ pub enum CopyLegacyCsvOption {
 }
 
 impl DialectDisplay for CopyLegacyCsvOption {
-    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> fmt::Result {
+    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> Result<(), SqlGenError> {
         use CopyLegacyCsvOption::*;
-        match self {
+        Ok(match self {
             Header => write!(f, "HEADER"),
             Quote(char) => write!(f, "QUOTE '{}'", char),
             Escape(char) => write!(f, "ESCAPE '{}'", char),
@@ -1528,7 +1531,7 @@ impl DialectDisplay for CopyLegacyCsvOption {
                     display_comma_separated(columns).sql(dialect)?
                 )
             }
-        }
+        }?)
     }
 }
 
@@ -1549,10 +1552,10 @@ pub enum MergeClause {
 }
 
 impl DialectDisplay for MergeClause {
-    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> fmt::Result {
+    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> Result<(), SqlGenError> {
         use MergeClause::*;
         write!(f, "WHEN")?;
-        match self {
+        Ok(match self {
             MatchedUpdate {
                 predicate,
                 assignments,
@@ -1590,7 +1593,7 @@ impl DialectDisplay for MergeClause {
                     values.sql(dialect)?
                 )
             }
-        }
+        }?)
     }
 }
 
@@ -1604,13 +1607,13 @@ pub enum DiscardObject {
 }
 
 impl DialectDisplay for DiscardObject {
-    fn fmt(&self, f: &mut (dyn fmt::Write), _dialect: &Dialect) -> fmt::Result {
-        match self {
+    fn fmt(&self, f: &mut (dyn fmt::Write), _dialect: &Dialect) -> Result<(), SqlGenError> {
+        Ok(match self {
             DiscardObject::ALL => f.write_str("ALL"),
             DiscardObject::PLANS => f.write_str("PLANS"),
             DiscardObject::SEQUENCES => f.write_str("SEQUENCES"),
             DiscardObject::TEMP => f.write_str("TEMP"),
-        }
+        }?)
     }
 }
 
@@ -1623,13 +1626,13 @@ pub enum CreateFunctionUsing {
 }
 
 impl DialectDisplay for CreateFunctionUsing {
-    fn fmt(&self, f: &mut (dyn fmt::Write), _dialect: &Dialect) -> fmt::Result {
+    fn fmt(&self, f: &mut (dyn fmt::Write), _dialect: &Dialect) -> Result<(), SqlGenError> {
         write!(f, "USING ")?;
-        match self {
+        Ok(match self {
             CreateFunctionUsing::Jar(uri) => write!(f, "JAR '{uri}'"),
             CreateFunctionUsing::File(uri) => write!(f, "FILE '{uri}'"),
             CreateFunctionUsing::Archive(uri) => write!(f, "ARCHIVE '{uri}'"),
-        }
+        }?)
     }
 }
 

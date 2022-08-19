@@ -28,7 +28,7 @@ use core::fmt::Debug;
 
 use crate::ast::*;
 use crate::dialect::DialectDisplay;
-use crate::parser::{Parser, ParserError};
+use crate::parser::{Parser, SqlGenError};
 use crate::tokenizer::Tokenizer;
 
 pub fn run_parser_method<F, T: Debug + PartialEq>(sql: &str, f: F) -> T
@@ -63,7 +63,7 @@ pub fn query_parses_to(sql: &str, canonical: &str) -> Query {
     query
 }
 
-pub fn parse_sql_query(sql: &str) -> Result<Query, ParserError> {
+pub fn parse_sql_query(sql: &str) -> Result<Query, SqlGenError> {
     Parser::parse_sql_query(sql)
 }
 

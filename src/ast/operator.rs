@@ -15,6 +15,7 @@ use core::fmt;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use crate::dialect::{Dialect, DialectDisplay};
+use crate::parser::SqlGenError;
 
 /// Unary operators
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -38,8 +39,8 @@ pub enum UnaryOperator {
 }
 
 impl DialectDisplay for UnaryOperator {
-    fn fmt(&self, f: &mut (dyn fmt::Write), _dialect: &Dialect) -> fmt::Result {
-        f.write_str(match self {
+    fn fmt(&self, f: &mut (dyn fmt::Write), _dialect: &Dialect) -> Result<(), SqlGenError> {
+        Ok(f.write_str(match self {
             UnaryOperator::Plus => "+",
             UnaryOperator::Minus => "-",
             UnaryOperator::Not => "NOT",
@@ -49,7 +50,7 @@ impl DialectDisplay for UnaryOperator {
             UnaryOperator::PGPostfixFactorial => "!",
             UnaryOperator::PGPrefixFactorial => "!!",
             UnaryOperator::PGAbs => "@",
-        })
+        })?)
     }
 }
 
@@ -90,8 +91,8 @@ pub enum BinaryOperator {
 }
 
 impl DialectDisplay for BinaryOperator {
-    fn fmt(&self, f: &mut (dyn fmt::Write), _dialect: &Dialect) -> fmt::Result {
-        f.write_str(match self {
+    fn fmt(&self, f: &mut (dyn fmt::Write), _dialect: &Dialect) -> Result<(), SqlGenError> {
+        Ok(f.write_str(match self {
             BinaryOperator::Plus => "+",
             BinaryOperator::Minus => "-",
             BinaryOperator::Multiply => "*",
@@ -122,6 +123,6 @@ impl DialectDisplay for BinaryOperator {
             BinaryOperator::PGRegexIMatch => "~*",
             BinaryOperator::PGRegexNotMatch => "!~",
             BinaryOperator::PGRegexNotIMatch => "!~*",
-        })
+        })?)
     }
 }

@@ -25,7 +25,7 @@ use matches::assert_matches;
 use sqlgen::ast::*;
 use sqlgen::dialect::{Dialect, DialectDisplay};
 use sqlgen::keywords::ALL_KEYWORDS;
-use sqlgen::parser::{Parser, ParserError};
+use sqlgen::parser::{Parser, SqlGenError};
 use sqlgen::test_utils::{
     parse_sql_query, query_parses_to, run_parser_method, verified_expr, verified_only_select,
     verified_query,
@@ -116,7 +116,7 @@ fn parse_select_distinct_tuple() {
 fn parse_select_distinct_missing_paren() {
     let result = parse_sql_query("SELECT DISTINCT (name, id FROM customer");
     assert_eq!(
-        ParserError::ParserError("Expected ), found: FROM".to_string()),
+        SqlGenError::ParserError("Expected ), found: FROM".to_string()),
         result.unwrap_err(),
     );
 }
@@ -130,7 +130,7 @@ fn parse_select_all() {
 fn parse_select_all_distinct() {
     let result = parse_sql_query("SELECT ALL DISTINCT name FROM customer");
     assert_eq!(
-        ParserError::ParserError("Cannot specify both ALL and DISTINCT".to_string()),
+        SqlGenError::ParserError("Cannot specify both ALL and DISTINCT".to_string()),
         result.unwrap_err(),
     );
 }
@@ -160,7 +160,7 @@ fn parse_select_into() {
     let sql = "SELECT * INTO table0 asdf FROM table1";
     let result = parse_sql_query(sql);
     assert_eq!(
-        ParserError::ParserError("Expected end of query, found: asdf".to_string()),
+        SqlGenError::ParserError("Expected end of query, found: asdf".to_string()),
         result.unwrap_err()
     )
 }
@@ -191,7 +191,7 @@ fn parse_select_wildcard() {
     let sql = "SELECT * + * FROM foo;";
     let result = parse_sql_query(sql);
     assert_eq!(
-        ParserError::ParserError("Expected end of query, found: +".to_string()),
+        SqlGenError::ParserError("Expected end of query, found: +".to_string()),
         result.unwrap_err(),
     );
 }
@@ -231,13 +231,13 @@ fn parse_column_aliases() {
 fn test_eof_after_as() {
     let res = parse_sql_query("SELECT foo AS");
     assert_eq!(
-        ParserError::ParserError("Expected an identifier after AS, found: EOF".to_string()),
+        SqlGenError::ParserError("Expected an identifier after AS, found: EOF".to_string()),
         res.unwrap_err()
     );
 
     let res = parse_sql_query("SELECT 1 FROM foo AS");
     assert_eq!(
-        ParserError::ParserError("Expected an identifier after AS, found: EOF".to_string()),
+        SqlGenError::ParserError("Expected an identifier after AS, found: EOF".to_string()),
         res.unwrap_err()
     );
 }
@@ -246,7 +246,7 @@ fn test_eof_after_as() {
 fn test_no_infix_error() {
     let res = Parser::parse_sql_query("SELECT-URA<<");
     assert_eq!(
-        ParserError::ParserError("No infix parser for token ShiftLeft".to_string()),
+        SqlGenError::ParserError("No infix parser for token ShiftLeft".to_string()),
         res.unwrap_err()
     );
 }
@@ -291,7 +291,7 @@ fn parse_select_count_distinct() {
     let sql = "SELECT COUNT(ALL DISTINCT + x) FROM customer";
     let res = parse_sql_query(sql);
     assert_eq!(
-        ParserError::ParserError("Cannot specify both ALL and DISTINCT".to_string()),
+        SqlGenError::ParserError("Cannot specify both ALL and DISTINCT".to_string()),
         res.unwrap_err()
     );
 }
@@ -307,7 +307,7 @@ fn parse_not() {
 fn parse_invalid_infix_not() {
     let res = parse_sql_query("SELECT c FROM t WHERE c NOT (");
     assert_eq!(
-        ParserError::ParserError("Expected end of query, found: NOT".to_string()),
+        SqlGenError::ParserError("Expected end of query, found: NOT".to_string()),
         res.unwrap_err(),
     );
 }
@@ -725,7 +725,7 @@ fn parse_in_error() {
     let sql = "SELECT * FROM customers WHERE segment in segment";
     let res = parse_sql_query(sql);
     assert_eq!(
-        ParserError::ParserError("Expected (, found: segment".to_string()),
+        SqlGenError::ParserError("Expected (, found: segment".to_string()),
         res.unwrap_err()
     );
 }
@@ -926,14 +926,14 @@ fn parse_tuple_invalid() {
     let sql = "select (1";
     let res = parse_sql_query(sql);
     assert_eq!(
-        ParserError::ParserError("Expected ), found: EOF".to_string()),
+        SqlGenError::ParserError("Expected ), found: EOF".to_string()),
         res.unwrap_err()
     );
 
     let sql = "select (), 2";
     let res = parse_sql_query(sql);
     assert_eq!(
-        ParserError::ParserError("Expected an expression:, found: )".to_string()),
+        SqlGenError::ParserError("Expected an expression:, found: )".to_string()),
         res.unwrap_err()
     );
 }
@@ -1279,7 +1279,7 @@ fn parse_extract() {
 
     let res = parse_sql_query("SELECT EXTRACT(MILLISECOND FROM d)");
     assert_eq!(
-        ParserError::ParserError("Expected date/time field, found: MILLISECOND".to_string()),
+        SqlGenError::ParserError("Expected date/time field, found: MILLISECOND".to_string()),
         res.unwrap_err()
     );
 }
@@ -1633,13 +1633,13 @@ fn parse_literal_interval() {
 
     let result = parse_sql_query("SELECT INTERVAL '1' SECOND TO SECOND");
     assert_eq!(
-        ParserError::ParserError("Expected end of query, found: SECOND".to_string()),
+        SqlGenError::ParserError("Expected end of query, found: SECOND".to_string()),
         result.unwrap_err(),
     );
 
     let result = parse_sql_query("SELECT INTERVAL '10' HOUR (1) TO HOUR (2)");
     assert_eq!(
-        ParserError::ParserError("Expected end of query, found: (".to_string()),
+        SqlGenError::ParserError("Expected end of query, found: (".to_string()),
         result.unwrap_err(),
     );
 
@@ -1757,13 +1757,13 @@ fn parse_table_function() {
 
     let res = parse_sql_query("SELECT * FROM TABLE '1' AS a");
     assert_eq!(
-        ParserError::ParserError("Expected (, found: \'1\'".to_string()),
+        SqlGenError::ParserError("Expected (, found: \'1\'".to_string()),
         res.unwrap_err()
     );
 
     let res = parse_sql_query("SELECT * FROM TABLE (FUN(a) AS a");
     assert_eq!(
-        ParserError::ParserError("Expected ), found: AS".to_string()),
+        SqlGenError::ParserError("Expected ), found: AS".to_string()),
         res.unwrap_err()
     );
 }
@@ -2231,7 +2231,7 @@ fn parse_natural_join() {
 
     let sql = "SELECT * FROM t1 natural";
     assert_eq!(
-        ParserError::ParserError("Expected a join type after NATURAL, found: EOF".to_string()),
+        SqlGenError::ParserError("Expected a join type after NATURAL, found: EOF".to_string()),
         parse_sql_query(sql).unwrap_err(),
     );
 }
@@ -2297,7 +2297,7 @@ fn parse_join_syntax_variants() {
 
     let res = parse_sql_query("SELECT * FROM a OUTER JOIN b ON 1");
     assert_eq!(
-        ParserError::ParserError("Expected APPLY, found: JOIN".to_string()),
+        SqlGenError::ParserError("Expected APPLY, found: JOIN".to_string()),
         res.unwrap_err()
     );
 }
@@ -2523,7 +2523,7 @@ fn parse_trim() {
     query_parses_to("SELECT TRIM('   foo   ')", "SELECT TRIM('   foo   ')");
 
     assert_eq!(
-        ParserError::ParserError("Expected ), found: 'xyz'".to_owned()),
+        SqlGenError::ParserError("Expected ), found: 'xyz'".to_owned()),
         parse_sql_query("SELECT TRIM(FOO 'xyz' FROM 'xyzfooxyz')").unwrap_err()
     );
 }
@@ -2556,7 +2556,7 @@ fn parse_exists_subquery() {
 
     let res = parse_sql_query("SELECT EXISTS (");
     assert_eq!(
-        ParserError::ParserError(
+        SqlGenError::ParserError(
             "Expected SELECT, VALUES, or a subquery in the query body, found: EOF".to_string()
         ),
         res.unwrap_err(),
@@ -2564,7 +2564,7 @@ fn parse_exists_subquery() {
 
     let res = parse_sql_query("SELECT EXISTS (NULL)");
     assert_eq!(
-        ParserError::ParserError(
+        SqlGenError::ParserError(
             "Expected SELECT, VALUES, or a subquery in the query body, found: NULL".to_string()
         ),
         res.unwrap_err(),
@@ -2575,7 +2575,7 @@ fn parse_exists_subquery() {
 fn parse_invalid_subquery_without_parens() {
     let res = parse_sql_query("SELECT SELECT 1 FROM bar WHERE 1=1 FROM baz");
     assert_eq!(
-        ParserError::ParserError("Expected end of query, found: 1".to_string()),
+        SqlGenError::ParserError("Expected end of query, found: 1".to_string()),
         res.unwrap_err()
     );
 }
@@ -2789,7 +2789,7 @@ fn lateral_derived() {
     let sql = "SELECT * FROM customer LEFT JOIN LATERAL generate_series(1, customer.id)";
     let res = parse_sql_query(sql);
     assert_eq!(
-        ParserError::ParserError(
+        SqlGenError::ParserError(
             "Expected subquery after LATERAL, found: generate_series".to_string()
         ),
         res.unwrap_err()
@@ -2798,7 +2798,7 @@ fn lateral_derived() {
     let sql = "SELECT * FROM a LEFT JOIN LATERAL (b CROSS JOIN c)";
     let res = parse_sql_query(sql);
     assert_eq!(
-        ParserError::ParserError(
+        SqlGenError::ParserError(
             "Expected SELECT, VALUES, or a subquery in the query body, found: b".to_string()
         ),
         res.unwrap_err()
@@ -2866,19 +2866,19 @@ fn parse_offset_and_limit() {
     // Can't repeat OFFSET / LIMIT
     let res = parse_sql_query("SELECT foo FROM bar OFFSET 2 OFFSET 2");
     assert_eq!(
-        ParserError::ParserError("Expected end of query, found: OFFSET".to_string()),
+        SqlGenError::ParserError("Expected end of query, found: OFFSET".to_string()),
         res.unwrap_err()
     );
 
     let res = parse_sql_query("SELECT foo FROM bar LIMIT 2 LIMIT 2");
     assert_eq!(
-        ParserError::ParserError("Expected end of query, found: LIMIT".to_string()),
+        SqlGenError::ParserError("Expected end of query, found: LIMIT".to_string()),
         res.unwrap_err()
     );
 
     let res = parse_sql_query("SELECT foo FROM bar OFFSET 2 LIMIT 2 OFFSET 2");
     assert_eq!(
-        ParserError::ParserError("Expected end of query, found: OFFSET".to_string()),
+        SqlGenError::ParserError("Expected end of query, found: OFFSET".to_string()),
         res.unwrap_err()
     );
 }
@@ -2949,14 +2949,14 @@ fn parse_position_negative() {
     let sql = "SELECT POSITION(foo) from bar";
     let res = parse_sql_query(sql);
     assert_eq!(
-        ParserError::ParserError("Position function must include IN keyword".to_string()),
+        SqlGenError::ParserError("Position function must include IN keyword".to_string()),
         res.unwrap_err()
     );
 
     let sql = "SELECT POSITION(foo IN) from bar";
     let res = parse_sql_query(sql);
     assert_eq!(
-        ParserError::ParserError("Expected an expression:, found: )".to_string()),
+        SqlGenError::ParserError("Expected an expression:, found: )".to_string()),
         res.unwrap_err()
     );
 }
@@ -2984,7 +2984,7 @@ fn parse_is_boolean() {
     let sql = "SELECT f from foo where field is 0";
     let res = parse_sql_query(sql);
     assert_eq!(
-        ParserError::ParserError(
+        SqlGenError::ParserError(
             "Expected [NOT] NULL or TRUE|FALSE or [NOT] DISTINCT FROM after IS, found: 0"
                 .to_string()
         ),

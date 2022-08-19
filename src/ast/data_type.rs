@@ -19,6 +19,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::ast::ObjectName;
 use crate::dialect::{Dialect, DialectDisplay};
+use crate::parser::SqlGenError;
 
 use super::value::escape_single_quote_string;
 
@@ -101,7 +102,7 @@ pub enum DataType {
 }
 
 impl DialectDisplay for DataType {
-    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> fmt::Result {
+    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> Result<(), SqlGenError> {
         match self {
             DataType::Char(size) => format_type_with_optional_length(f, dialect, "CHAR", size, false),
             DataType::Varchar(size) => {
@@ -110,14 +111,14 @@ impl DialectDisplay for DataType {
             DataType::Nvarchar(size) => {
                 format_type_with_optional_length(f, dialect, "NVARCHAR", size, false)
             }
-            DataType::Uuid => write!(f, "UUID"),
-            DataType::Clob(size) => write!(f, "CLOB({})", size),
-            DataType::Binary(size) => write!(f, "BINARY({})", size),
-            DataType::Varbinary(size) => write!(f, "VARBINARY({})", size),
-            DataType::Blob(size) => write!(f, "BLOB({})", size),
+            DataType::Uuid => Ok(write!(f, "UUID")?),
+            DataType::Clob(size) => Ok(write!(f, "CLOB({})", size)?),
+            DataType::Binary(size) => Ok(write!(f, "BINARY({})", size)?),
+            DataType::Varbinary(size) => Ok(write!(f, "VARBINARY({})", size)?),
+            DataType::Blob(size) => Ok(write!(f, "BLOB({})", size)?),
             DataType::Decimal(precision, scale) => {
                 if let Some(scale) = scale {
-                    write!(f, "NUMERIC({},{})", precision.unwrap(), scale)
+                    Ok(write!(f, "NUMERIC({},{})", precision.unwrap(), scale)?)
                 } else {
                     format_type_with_optional_length(f, dialect, "NUMERIC", precision, false)
                 }
@@ -151,20 +152,20 @@ impl DialectDisplay for DataType {
             DataType::UnsignedBigInt(zerofill) => {
                 format_type_with_optional_length(f, dialect, "BIGINT", zerofill, true)
             }
-            DataType::Real => write!(f, "REAL"),
-            DataType::Double => write!(f, "DOUBLE"),
-            DataType::Boolean => write!(f, "BOOLEAN"),
-            DataType::Date => write!(f, "DATE"),
-            DataType::Time => write!(f, "TIME"),
-            DataType::Datetime => write!(f, "DATETIME"),
-            DataType::Timestamp => write!(f, "TIMESTAMP"),
-            DataType::Interval => write!(f, "INTERVAL"),
-            DataType::Regclass => write!(f, "REGCLASS"),
-            DataType::Text => write!(f, "TEXT"),
-            DataType::String => write!(f, "STRING"),
-            DataType::Bytea => write!(f, "BYTEA"),
-            DataType::Array(ty) => write!(f, "{}[]", ty.sql(dialect)?),
-            DataType::Custom(ty) => write!(f, "{}", ty.sql(dialect)?),
+            DataType::Real => Ok(write!(f, "REAL")?),
+            DataType::Double => Ok(write!(f, "DOUBLE")?),
+            DataType::Boolean => Ok(write!(f, "BOOLEAN")?),
+            DataType::Date => Ok(write!(f, "DATE")?),
+            DataType::Time => Ok(write!(f, "TIME")?),
+            DataType::Datetime => Ok(write!(f, "DATETIME")?),
+            DataType::Timestamp => Ok(write!(f, "TIMESTAMP")?),
+            DataType::Interval => Ok(write!(f, "INTERVAL")?),
+            DataType::Regclass => Ok(write!(f, "REGCLASS")?),
+            DataType::Text => Ok(write!(f, "TEXT")?),
+            DataType::String => Ok(write!(f, "STRING")?),
+            DataType::Bytea => Ok(write!(f, "BYTEA")?),
+            DataType::Array(ty) => Ok(write!(f, "{}[]", ty.sql(dialect)?)?),
+            DataType::Custom(ty) => Ok(write!(f, "{}", ty.sql(dialect)?)?),
             DataType::Enum(vals) => {
                 write!(f, "ENUM(")?;
                 for (i, v) in vals.iter().enumerate() {
@@ -173,7 +174,7 @@ impl DialectDisplay for DataType {
                     }
                     write!(f, "'{}'", escape_single_quote_string(v).sql(dialect)?)?;
                 }
-                write!(f, ")")
+                Ok(write!(f, ")")?)
             }
             DataType::Set(vals) => {
                 write!(f, "SET(")?;
@@ -183,7 +184,7 @@ impl DialectDisplay for DataType {
                     }
                     write!(f, "'{}'", escape_single_quote_string(v).sql(dialect)?)?;
                 }
-                write!(f, ")")
+                Ok(write!(f, ")")?)
             }
         }
     }
@@ -195,7 +196,7 @@ fn format_type_with_optional_length(
     sql_type: &'static str,
     len: &Option<u64>,
     unsigned: bool,
-) -> fmt::Result {
+) -> Result<(), SqlGenError> {
     write!(f, "{}", sql_type)?;
     if let Some(len) = len {
         write!(f, "({})", len)?;

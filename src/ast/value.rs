@@ -21,6 +21,7 @@ use bigdecimal::BigDecimal;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use crate::dialect::{Dialect, DialectDisplay};
+use crate::parser::SqlGenError;
 
 use super::Expr;
 
@@ -72,8 +73,8 @@ pub enum Value {
 }
 
 impl DialectDisplay for Value {
-    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> fmt::Result {
-        match self {
+    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> Result<(), SqlGenError> {
+        Ok(match self {
             Value::Number(v, l) => write!(f, "{}{long}", v, long = if *l { "L" } else { "" }),
             Value::DoubleQuotedString(v) => write!(f, "\"{}\"", v),
             Value::SingleQuotedString(v) => write!(f, "'{}'", escape_single_quote_string(v).sql(dialect)?),
@@ -121,7 +122,7 @@ impl DialectDisplay for Value {
             }
             Value::Null => write!(f, "NULL"),
             Value::Placeholder(v) => write!(f, "{}", v),
-        }
+        }?)
     }
 }
 
@@ -153,8 +154,8 @@ pub enum DateTimeField {
 }
 
 impl DialectDisplay for DateTimeField {
-    fn fmt(&self, f: &mut (dyn fmt::Write), _dialect: &Dialect) -> fmt::Result {
-        f.write_str(match self {
+    fn fmt(&self, f: &mut (dyn fmt::Write), _dialect: &Dialect) -> Result<(), SqlGenError> {
+        Ok(f.write_str(match self {
             DateTimeField::Year => "YEAR",
             DateTimeField::Month => "MONTH",
             DateTimeField::Week => "WEEK",
@@ -177,7 +178,7 @@ impl DialectDisplay for DateTimeField {
             DateTimeField::Timezone => "TIMEZONE",
             DateTimeField::TimezoneHour => "TIMEZONE_HOUR",
             DateTimeField::TimezoneMinute => "TIMEZONE_MINUTE",
-        })
+        })?)
     }
 }
 
@@ -187,7 +188,7 @@ pub struct EscapeQuotedString<'a> {
 }
 
 impl<'a> DialectDisplay for EscapeQuotedString<'a> {
-    fn fmt(&self, f: &mut (dyn fmt::Write), _dialect: &Dialect) -> fmt::Result {
+    fn fmt(&self, f: &mut (dyn fmt::Write), _dialect: &Dialect) -> Result<(), SqlGenError> {
         for c in self.string.chars() {
             if c == self.quote {
                 write!(f, "{q}{q}", q = self.quote)?;
@@ -210,7 +211,7 @@ pub fn escape_single_quote_string(s: &str) -> EscapeQuotedString<'_> {
 pub struct EscapeEscapedStringLiteral<'a>(&'a str);
 
 impl<'a> DialectDisplay for EscapeEscapedStringLiteral<'a> {
-    fn fmt(&self, f: &mut (dyn fmt::Write), _dialect: &Dialect) -> fmt::Result {
+    fn fmt(&self, f: &mut (dyn fmt::Write), _dialect: &Dialect) -> Result<(), SqlGenError> {
         for c in self.0.chars() {
             match c {
                 '\'' => {
@@ -250,12 +251,12 @@ pub enum TrimWhereField {
 }
 
 impl DialectDisplay for TrimWhereField {
-    fn fmt(&self, f: &mut (dyn fmt::Write), _dialect: &Dialect) -> fmt::Result {
+    fn fmt(&self, f: &mut (dyn fmt::Write), _dialect: &Dialect) -> Result<(), SqlGenError> {
         use TrimWhereField::*;
-        f.write_str(match self {
+        Ok(f.write_str(match self {
             Both => "BOTH",
             Leading => "LEADING",
             Trailing => "TRAILING",
-        })
+        })?)
     }
 }

@@ -32,6 +32,7 @@ use core::str::Chars;
 use serde::{Deserialize, Serialize};
 
 use crate::keywords::{Keyword, ALL_KEYWORDS, ALL_KEYWORDS_INDEX};
+use crate::parser::SqlGenError;
 
 fn is_delimited_identifier_start(ch: char) -> bool {
     ch == '`' || ch == '"'

@@ -21,6 +21,7 @@ use alloc::{
     vec::Vec,
 };
 use core::fmt;
+use core::fmt::Error;
 
 use log::debug;
 
@@ -29,15 +30,23 @@ use crate::keywords::{self, Keyword};
 use crate::tokenizer::*;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum ParserError {
+pub enum SqlGenError {
     TokenizerError(String),
     ParserError(String),
+    FormatError(fmt::Error),
+    DialectError(String),
+}
+
+impl From<fmt::Error> for SqlGenError {
+    fn from(err: Error) -> Self {
+        SqlGenError::FormatError(err)
+    }
 }
 
 // Use `Parser::expected` instead, if possible
 macro_rules! parser_err {
     ($MSG:expr) => {
-        Err(ParserError::ParserError($MSG.to_string()))
+        Err(SqlGenError::ParserError($MSG.to_string()))
     };
 }
 
@@ -82,27 +91,29 @@ impl From<WildcardExpr> for FunctionArgExpr {
     }
 }
 
-impl From<TokenizerError> for ParserError {
+impl From<TokenizerError> for SqlGenError {
     fn from(e: TokenizerError) -> Self {
-        ParserError::TokenizerError(e.to_string())
+        SqlGenError::TokenizerError(e.to_string())
     }
 }
 
-impl fmt::Display for ParserError {
+impl fmt::Display for SqlGenError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "sql parser error: {}",
+            "sqlgen error: {}",
             match self {
-                ParserError::TokenizerError(s) => s,
-                ParserError::ParserError(s) => s,
+                SqlGenError::TokenizerError(s) => s.clone(),
+                SqlGenError::ParserError(s) => s.clone(),
+                SqlGenError::FormatError(err) => err.to_string(),
+                SqlGenError::DialectError(s) => s.clone(),
             }
         )
     }
 }
 
 #[cfg(feature = "std")]
-impl std::error::Error for ParserError {}
+impl std::error::Error for SqlGenError {}
 
 pub struct Parser {
     tokens: Vec<Token>,
@@ -117,7 +128,7 @@ impl Parser {
     }
 
     /// Parse a SQL query and produce an Abstract Syntax Tree (AST)
-    pub fn parse_sql_query(sql: &str) -> Result<Query, ParserError> {
+    pub fn parse_sql_query(sql: &str) -> Result<Query, SqlGenError> {
         let mut tokenizer = Tokenizer::new(sql);
         let tokens = tokenizer.tokenize()?;
         let mut parser = Parser::new(tokens);
@@ -127,7 +138,7 @@ impl Parser {
         if parser.peek_token() == Token::EOF {
             Ok(query)
         } else {
-            Err(ParserError::ParserError(format!(
+            Err(SqlGenError::ParserError(format!(
                 "Expected end of query, found: {}",
                 parser.peek_token()
             )))
@@ -135,7 +146,7 @@ impl Parser {
     }
 
     /// Parse a new expression including wildcard & qualified wildcard
-    pub fn parse_wildcard_expr(&mut self) -> Result<WildcardExpr, ParserError> {
+    pub fn parse_wildcard_expr(&mut self) -> Result<WildcardExpr, SqlGenError> {
         let index = self.index;
 
         match self.next_token() {
@@ -165,12 +176,12 @@ impl Parser {
     }
 
     /// Parse a new expression
-    pub fn parse_expr(&mut self) -> Result<Expr, ParserError> {
+    pub fn parse_expr(&mut self) -> Result<Expr, SqlGenError> {
         self.parse_subexpr(0)
     }
 
     /// Parse tokens until the precedence changes
-    pub fn parse_subexpr(&mut self, precedence: u8) -> Result<Expr, ParserError> {
+    pub fn parse_subexpr(&mut self, precedence: u8) -> Result<Expr, SqlGenError> {
         debug!("parsing expr");
         let mut expr = self.parse_prefix()?;
         debug!("prefix: {:?}", expr);
@@ -188,7 +199,7 @@ impl Parser {
     }
 
     /// Parse an expression prefix
-    pub fn parse_prefix(&mut self) -> Result<Expr, ParserError> {
+    pub fn parse_prefix(&mut self) -> Result<Expr, SqlGenError> {
         // PostgreSQL allows any string literal to be preceded by a type name, indicating that the
         // string literal represents a literal of that type. Some examples:
         //
@@ -344,7 +355,7 @@ impl Parser {
         }
     }
 
-    pub fn parse_function(&mut self, name: ObjectName) -> Result<Expr, ParserError> {
+    pub fn parse_function(&mut self, name: ObjectName) -> Result<Expr, SqlGenError> {
         self.expect_token(&Token::LParen)?;
         let distinct = self.parse_all_or_distinct()?;
         let args = self.parse_optional_args()?;
@@ -387,7 +398,7 @@ impl Parser {
         }))
     }
 
-    pub fn parse_time_functions(&mut self, name: ObjectName) -> Result<Expr, ParserError> {
+    pub fn parse_time_functions(&mut self, name: ObjectName) -> Result<Expr, SqlGenError> {
         let args = if self.consume_token(&Token::LParen) {
             self.parse_optional_args()?
         } else {
@@ -401,7 +412,7 @@ impl Parser {
         }))
     }
 
-    pub fn parse_window_frame_units(&mut self) -> Result<WindowFrameUnits, ParserError> {
+    pub fn parse_window_frame_units(&mut self) -> Result<WindowFrameUnits, SqlGenError> {
         match self.next_token() {
             Token::Word(w) => match w.keyword {
                 Keyword::ROWS => Ok(WindowFrameUnits::Rows),
@@ -413,7 +424,7 @@ impl Parser {
         }
     }
 
-    pub fn parse_window_frame(&mut self) -> Result<WindowFrame, ParserError> {
+    pub fn parse_window_frame(&mut self) -> Result<WindowFrame, SqlGenError> {
         let units = self.parse_window_frame_units()?;
         let (start_bound, end_bound) = if self.parse_keyword(Keyword::BETWEEN) {
             let start_bound = self.parse_window_frame_bound()?;
@@ -431,7 +442,7 @@ impl Parser {
     }
 
     /// Parse `CURRENT ROW` or `{ <positive number> | UNBOUNDED } { PRECEDING | FOLLOWING }`
-    pub fn parse_window_frame_bound(&mut self) -> Result<WindowFrameBound, ParserError> {
+    pub fn parse_window_frame_bound(&mut self) -> Result<WindowFrameBound, SqlGenError> {
         if self.parse_keywords(&[Keyword::CURRENT, Keyword::ROW]) {
             Ok(WindowFrameBound::CurrentRow)
         } else {
@@ -452,7 +463,7 @@ impl Parser {
 
     /// parse a group by expr. a group by expr can be one of group sets, roll up, cube, or simple
     /// expr.
-    fn parse_group_by_expr(&mut self) -> Result<Expr, ParserError> {
+    fn parse_group_by_expr(&mut self) -> Result<Expr, SqlGenError> {
         if self.parse_keywords(&[Keyword::GROUPING, Keyword::SETS]) {
             self.expect_token(&Token::LParen)?;
             let result = self.parse_comma_separated(|p| p.parse_tuple(false, true))?;
@@ -480,7 +491,7 @@ impl Parser {
         &mut self,
         lift_singleton: bool,
         allow_empty: bool,
-    ) -> Result<Vec<Expr>, ParserError> {
+    ) -> Result<Vec<Expr>, SqlGenError> {
         if lift_singleton {
             if self.consume_token(&Token::LParen) {
                 let result = if allow_empty && self.consume_token(&Token::RParen) {
@@ -507,7 +518,7 @@ impl Parser {
         }
     }
 
-    pub fn parse_case_expr(&mut self) -> Result<Expr, ParserError> {
+    pub fn parse_case_expr(&mut self) -> Result<Expr, SqlGenError> {
         let mut operand = None;
         if !self.parse_keyword(Keyword::WHEN) {
             operand = Some(Box::new(self.parse_expr()?));
@@ -538,7 +549,7 @@ impl Parser {
     }
 
     /// Parse a SQL CAST function e.g. `CAST(expr AS FLOAT)`
-    pub fn parse_cast_expr(&mut self) -> Result<Expr, ParserError> {
+    pub fn parse_cast_expr(&mut self) -> Result<Expr, SqlGenError> {
         self.expect_token(&Token::LParen)?;
         let expr = self.parse_expr()?;
         self.expect_keyword(Keyword::AS)?;
@@ -551,7 +562,7 @@ impl Parser {
     }
 
     /// Parse a SQL TRY_CAST function e.g. `TRY_CAST(expr AS FLOAT)`
-    pub fn parse_try_cast_expr(&mut self) -> Result<Expr, ParserError> {
+    pub fn parse_try_cast_expr(&mut self) -> Result<Expr, SqlGenError> {
         self.expect_token(&Token::LParen)?;
         let expr = self.parse_expr()?;
         self.expect_keyword(Keyword::AS)?;
@@ -564,7 +575,7 @@ impl Parser {
     }
 
     /// Parse a SQL EXISTS expression e.g. `WHERE EXISTS(SELECT ...)`.
-    pub fn parse_exists_expr(&mut self, negated: bool) -> Result<Expr, ParserError> {
+    pub fn parse_exists_expr(&mut self, negated: bool) -> Result<Expr, SqlGenError> {
         self.expect_token(&Token::LParen)?;
         let exists_node = Expr::Exists {
             negated,
@@ -574,7 +585,7 @@ impl Parser {
         Ok(exists_node)
     }
 
-    pub fn parse_extract_expr(&mut self) -> Result<Expr, ParserError> {
+    pub fn parse_extract_expr(&mut self) -> Result<Expr, SqlGenError> {
         self.expect_token(&Token::LParen)?;
         let field = self.parse_date_time_field()?;
         self.expect_keyword(Keyword::FROM)?;
@@ -586,7 +597,7 @@ impl Parser {
         })
     }
 
-    pub fn parse_position_expr(&mut self) -> Result<Expr, ParserError> {
+    pub fn parse_position_expr(&mut self) -> Result<Expr, SqlGenError> {
         // PARSE SELECT POSITION('@' in field)
         self.expect_token(&Token::LParen)?;
 
@@ -604,7 +615,7 @@ impl Parser {
         }
     }
 
-    pub fn parse_substring_expr(&mut self) -> Result<Expr, ParserError> {
+    pub fn parse_substring_expr(&mut self) -> Result<Expr, SqlGenError> {
         // PARSE SUBSTRING (EXPR [FROM 1] [FOR 3])
         self.expect_token(&Token::LParen)?;
         let expr = self.parse_expr()?;
@@ -628,7 +639,7 @@ impl Parser {
 
     /// TRIM (WHERE 'text' FROM 'text')\
     /// TRIM ('text')
-    pub fn parse_trim_expr(&mut self) -> Result<Expr, ParserError> {
+    pub fn parse_trim_expr(&mut self) -> Result<Expr, SqlGenError> {
         self.expect_token(&Token::LParen)?;
         let mut where_expr = None;
         if let Token::Word(word) = self.peek_token() {
@@ -651,7 +662,7 @@ impl Parser {
         })
     }
 
-    pub fn parse_trim_where(&mut self) -> Result<TrimWhereField, ParserError> {
+    pub fn parse_trim_where(&mut self) -> Result<TrimWhereField, SqlGenError> {
         match self.next_token() {
             Token::Word(w) => match w.keyword {
                 Keyword::BOTH => Ok(TrimWhereField::Both),
@@ -665,7 +676,7 @@ impl Parser {
 
     /// Parses an array expression `[ex1, ex2, ..]`
     /// if `named` is `true`, came from an expression like  `ARRAY[ex1, ex2]`
-    pub fn parse_array_expr(&mut self, named: bool) -> Result<Expr, ParserError> {
+    pub fn parse_array_expr(&mut self, named: bool) -> Result<Expr, SqlGenError> {
         if self.peek_token() == Token::RBracket {
             let _ = self.next_token();
             Ok(Expr::Array(Array {
@@ -680,7 +691,7 @@ impl Parser {
     }
 
     /// Parse a SQL LISTAGG expression, e.g. `LISTAGG(...) WITHIN GROUP (ORDER BY ...)`.
-    pub fn parse_listagg_expr(&mut self) -> Result<Expr, ParserError> {
+    pub fn parse_listagg_expr(&mut self) -> Result<Expr, SqlGenError> {
         self.expect_token(&Token::LParen)?;
         let distinct = self.parse_all_or_distinct()?;
         let expr = Box::new(self.parse_expr()?);
@@ -745,7 +756,7 @@ impl Parser {
     // operator and interval qualifiers. EXTRACT supports a wider set of
     // date/time fields than interval qualifiers, so this function may need to
     // be split in two.
-    pub fn parse_date_time_field(&mut self) -> Result<DateTimeField, ParserError> {
+    pub fn parse_date_time_field(&mut self) -> Result<DateTimeField, SqlGenError> {
         match self.next_token() {
             Token::Word(w) => match w.keyword {
                 Keyword::YEAR => Ok(DateTimeField::Year),
@@ -776,7 +787,7 @@ impl Parser {
         }
     }
 
-    pub fn parse_not(&mut self) -> Result<Expr, ParserError> {
+    pub fn parse_not(&mut self) -> Result<Expr, SqlGenError> {
         match self.peek_token() {
             Token::Word(w) => match w.keyword {
                 Keyword::EXISTS => {
@@ -809,7 +820,7 @@ impl Parser {
     ///   7. (MySql and BigQuey only):`INTERVAL 1 DAY`
     ///
     /// Note that we do not currently attempt to parse the quoted value.
-    pub fn parse_literal_interval(&mut self) -> Result<Expr, ParserError> {
+    pub fn parse_literal_interval(&mut self) -> Result<Expr, SqlGenError> {
         // The SQL standard allows an optional sign before the value string, but
         // it is not clear if any implementations support that syntax, so we
         // don't currently try to parse it. (The sign can instead be included
@@ -893,7 +904,7 @@ impl Parser {
     }
 
     /// Parse an operator following an expression
-    pub fn parse_infix(&mut self, expr: Expr, precedence: u8) -> Result<Expr, ParserError> {
+    pub fn parse_infix(&mut self, expr: Expr, precedence: u8) -> Result<Expr, SqlGenError> {
         let tok = self.next_token();
 
         let regular_binary_operator = match &tok {
@@ -1039,7 +1050,7 @@ impl Parser {
         }
     }
 
-    pub fn parse_array_index(&mut self, expr: Expr) -> Result<Expr, ParserError> {
+    pub fn parse_array_index(&mut self, expr: Expr) -> Result<Expr, SqlGenError> {
         let index = self.parse_expr()?;
         self.expect_token(&Token::RBracket)?;
         let mut indexes: Vec<Expr> = vec![index];
@@ -1054,7 +1065,7 @@ impl Parser {
         })
     }
 
-    pub fn parse_map_access(&mut self, expr: Expr) -> Result<Expr, ParserError> {
+    pub fn parse_map_access(&mut self, expr: Expr) -> Result<Expr, SqlGenError> {
         let key = self.parse_map_key()?;
         let tok = self.consume_token(&Token::RBracket);
         debug!("Tok: {}", tok);
@@ -1075,7 +1086,7 @@ impl Parser {
     }
 
     /// Parses the parens following the `[ NOT ] IN` operator
-    pub fn parse_in(&mut self, expr: Expr, negated: bool) -> Result<Expr, ParserError> {
+    pub fn parse_in(&mut self, expr: Expr, negated: bool) -> Result<Expr, SqlGenError> {
         // BigQuery allows `IN UNNEST(array_expression)`
         // https://cloud.google.com/bigquery/docs/reference/standard-sql/operators#in_operators
         if self.parse_keyword(Keyword::UNNEST) {
@@ -1108,7 +1119,7 @@ impl Parser {
     }
 
     /// Parses `BETWEEN <low> AND <high>`, assuming the `BETWEEN` keyword was already consumed
-    pub fn parse_between(&mut self, expr: Expr, negated: bool) -> Result<Expr, ParserError> {
+    pub fn parse_between(&mut self, expr: Expr, negated: bool) -> Result<Expr, SqlGenError> {
         // Stop parsing subexpressions for <low> and <high> on tokens with
         // precedence lower than that of `BETWEEN`, such as `AND`, `IS`, etc.
         let low = self.parse_subexpr(Self::BETWEEN_PREC)?;
@@ -1123,7 +1134,7 @@ impl Parser {
     }
 
     /// Parse a postgresql casting style which is in the form of `expr::datatype`
-    pub fn parse_pg_cast(&mut self, expr: Expr) -> Result<Expr, ParserError> {
+    pub fn parse_pg_cast(&mut self, expr: Expr) -> Result<Expr, SqlGenError> {
         Ok(Expr::Cast {
             expr: Box::new(expr),
             data_type: self.parse_data_type()?,
@@ -1136,7 +1147,7 @@ impl Parser {
     const TIME_ZONE_PREC: u8 = 20;
 
     /// Get the precedence of the next token
-    pub fn get_next_precedence(&self) -> Result<u8, ParserError> {
+    pub fn get_next_precedence(&self) -> Result<u8, SqlGenError> {
         let token = self.peek_token();
         debug!("get_next_precedence() {:?}", token);
         let token_0 = self.peek_nth_token(0);
@@ -1261,7 +1272,7 @@ impl Parser {
     }
 
     /// Report unexpected token
-    fn expected<T>(&self, expected: &str, found: Token) -> Result<T, ParserError> {
+    fn expected<T>(&self, expected: &str, found: Token) -> Result<T, SqlGenError> {
         parser_err!(format!("Expected {}, found: {}", expected, found))
     }
 
@@ -1310,7 +1321,7 @@ impl Parser {
     }
 
     /// Bail out if the current token is not one of the expected keywords, or consume it if it is
-    pub fn expect_one_of_keywords(&mut self, keywords: &[Keyword]) -> Result<Keyword, ParserError> {
+    pub fn expect_one_of_keywords(&mut self, keywords: &[Keyword]) -> Result<Keyword, SqlGenError> {
         if let Some(keyword) = self.parse_one_of_keywords(keywords) {
             Ok(keyword)
         } else {
@@ -1323,7 +1334,7 @@ impl Parser {
     }
 
     /// Bail out if the current token is not an expected keyword, or consume it if it is
-    pub fn expect_keyword(&mut self, expected: Keyword) -> Result<(), ParserError> {
+    pub fn expect_keyword(&mut self, expected: Keyword) -> Result<(), SqlGenError> {
         if self.parse_keyword(expected) {
             Ok(())
         } else {
@@ -1333,7 +1344,7 @@ impl Parser {
 
     /// Bail out if the following tokens are not the expected sequence of
     /// keywords, or consume them if they are.
-    pub fn expect_keywords(&mut self, expected: &[Keyword]) -> Result<(), ParserError> {
+    pub fn expect_keywords(&mut self, expected: &[Keyword]) -> Result<(), SqlGenError> {
         for &kw in expected {
             self.expect_keyword(kw)?;
         }
@@ -1352,7 +1363,7 @@ impl Parser {
     }
 
     /// Bail out if the current token is not an expected keyword, or consume it if it is
-    pub fn expect_token(&mut self, expected: &Token) -> Result<(), ParserError> {
+    pub fn expect_token(&mut self, expected: &Token) -> Result<(), SqlGenError> {
         if self.consume_token(expected) {
             Ok(())
         } else {
@@ -1361,9 +1372,9 @@ impl Parser {
     }
 
     /// Parse a comma-separated list of 1+ items accepted by `F`
-    pub fn parse_comma_separated<T, F>(&mut self, mut f: F) -> Result<Vec<T>, ParserError>
+    pub fn parse_comma_separated<T, F>(&mut self, mut f: F) -> Result<Vec<T>, SqlGenError>
     where
-        F: FnMut(&mut Parser) -> Result<T, ParserError>,
+        F: FnMut(&mut Parser) -> Result<T, SqlGenError>,
     {
         let mut values = vec![];
         loop {
@@ -1380,7 +1391,7 @@ impl Parser {
     #[must_use]
     fn maybe_parse<T, F>(&mut self, mut f: F) -> Option<T>
     where
-        F: FnMut(&mut Parser) -> Result<T, ParserError>,
+        F: FnMut(&mut Parser) -> Result<T, SqlGenError>,
     {
         let index = self.index;
         if let Ok(t) = f(self) {
@@ -1393,7 +1404,7 @@ impl Parser {
 
     /// Parse either `ALL` or `DISTINCT`. Returns `true` if `DISTINCT` is parsed and results in a
     /// `ParserError` if both `ALL` and `DISTINCT` are fround.
-    pub fn parse_all_or_distinct(&mut self) -> Result<bool, ParserError> {
+    pub fn parse_all_or_distinct(&mut self) -> Result<bool, SqlGenError> {
         let all = self.parse_keyword(Keyword::ALL);
         let distinct = self.parse_keyword(Keyword::DISTINCT);
         if all && distinct {
@@ -1403,7 +1414,7 @@ impl Parser {
         }
     }
 
-    pub fn parse_file_format(&mut self) -> Result<FileFormat, ParserError> {
+    pub fn parse_file_format(&mut self) -> Result<FileFormat, SqlGenError> {
         match self.next_token() {
             Token::Word(w) => match w.keyword {
                 Keyword::AVRO => Ok(FileFormat::AVRO),
@@ -1419,7 +1430,7 @@ impl Parser {
         }
     }
 
-    pub fn parse_options(&mut self, keyword: Keyword) -> Result<Vec<SqlOption>, ParserError> {
+    pub fn parse_options(&mut self, keyword: Keyword) -> Result<Vec<SqlOption>, SqlGenError> {
         if self.parse_keyword(keyword) {
             self.expect_token(&Token::LParen)?;
             let options = self.parse_comma_separated(Parser::parse_sql_option)?;
@@ -1430,7 +1441,7 @@ impl Parser {
         }
     }
 
-    pub fn parse_sql_option(&mut self) -> Result<SqlOption, ParserError> {
+    pub fn parse_sql_option(&mut self) -> Result<SqlOption, SqlGenError> {
         let name = self.parse_identifier()?;
         self.expect_token(&Token::Eq)?;
         let value = self.parse_value()?;
@@ -1475,7 +1486,7 @@ impl Parser {
     }
 
     /// Parse a literal value (numbers, strings, date/time, booleans)
-    pub fn parse_value(&mut self) -> Result<Value, ParserError> {
+    pub fn parse_value(&mut self) -> Result<Value, SqlGenError> {
         match self.next_token() {
             Token::Word(w) => match w.keyword {
                 Keyword::TRUE => Ok(Value::Boolean(true)),
@@ -1505,7 +1516,7 @@ impl Parser {
         }
     }
 
-    pub fn parse_number_value(&mut self) -> Result<Value, ParserError> {
+    pub fn parse_number_value(&mut self) -> Result<Value, SqlGenError> {
         match self.parse_value()? {
             v @ Value::Number(_, _) => Ok(v),
             v @ Value::Placeholder(_) => Ok(v),
@@ -1517,17 +1528,17 @@ impl Parser {
     }
 
     /// Parse an unsigned literal integer/long
-    pub fn parse_literal_uint(&mut self) -> Result<u64, ParserError> {
+    pub fn parse_literal_uint(&mut self) -> Result<u64, SqlGenError> {
         match self.next_token() {
             Token::Number(s, _) => s.parse::<u64>().map_err(|e| {
-                ParserError::ParserError(format!("Could not parse '{}' as u64: {}", s, e))
+                SqlGenError::ParserError(format!("Could not parse '{}' as u64: {}", s, e))
             }),
             unexpected => self.expected("literal int", unexpected),
         }
     }
 
     /// Parse a literal string
-    pub fn parse_literal_string(&mut self) -> Result<String, ParserError> {
+    pub fn parse_literal_string(&mut self) -> Result<String, SqlGenError> {
         match self.next_token() {
             Token::Word(Word { value, keyword, .. }) if keyword == Keyword::NoKeyword => Ok(value),
             Token::SingleQuotedString(s) => Ok(s),
@@ -1538,7 +1549,7 @@ impl Parser {
     }
 
     /// Parse a map key string
-    pub fn parse_map_key(&mut self) -> Result<Expr, ParserError> {
+    pub fn parse_map_key(&mut self) -> Result<Expr, SqlGenError> {
         match self.next_token() {
             Token::Word(Word { value, keyword, .. }) if keyword == Keyword::NoKeyword => {
                 if self.peek_token() == Token::LParen {
@@ -1556,7 +1567,7 @@ impl Parser {
     }
 
     /// Parse a SQL datatype (in the context of a CREATE TABLE statement for example)
-    pub fn parse_data_type(&mut self) -> Result<DataType, ParserError> {
+    pub fn parse_data_type(&mut self) -> Result<DataType, SqlGenError> {
         let mut data = match self.next_token() {
             Token::Word(w) => match w.keyword {
                 Keyword::BOOLEAN => Ok(DataType::Boolean),
@@ -1673,7 +1684,7 @@ impl Parser {
         Ok(data)
     }
 
-    pub fn parse_string_values(&mut self) -> Result<Vec<String>, ParserError> {
+    pub fn parse_string_values(&mut self) -> Result<Vec<String>, SqlGenError> {
         self.expect_token(&Token::LParen)?;
         let mut values = Vec::new();
         loop {
@@ -1696,7 +1707,7 @@ impl Parser {
     pub fn parse_optional_alias(
         &mut self,
         reserved_kwds: &[Keyword],
-    ) -> Result<Option<Ident>, ParserError> {
+    ) -> Result<Option<Ident>, SqlGenError> {
         let after_as = self.parse_keyword(Keyword::AS);
         match self.next_token() {
             // Accept any identifier after `AS` (though many dialects have restrictions on
@@ -1737,7 +1748,7 @@ impl Parser {
     pub fn parse_optional_table_alias(
         &mut self,
         reserved_kwds: &[Keyword],
-    ) -> Result<Option<TableAlias>, ParserError> {
+    ) -> Result<Option<TableAlias>, SqlGenError> {
         match self.parse_optional_alias(reserved_kwds)? {
             Some(name) => {
                 let columns = self.parse_parenthesized_column_list(Optional)?;
@@ -1749,7 +1760,7 @@ impl Parser {
 
     /// Parse a possibly qualified, possibly quoted identifier, e.g.
     /// `foo` or `myschema."table"
-    pub fn parse_object_name(&mut self) -> Result<ObjectName, ParserError> {
+    pub fn parse_object_name(&mut self) -> Result<ObjectName, SqlGenError> {
         let mut idents = vec![];
         loop {
             idents.push(self.parse_identifier()?);
@@ -1761,7 +1772,7 @@ impl Parser {
     }
 
     /// Parse identifiers strictly i.e. don't parse keywords
-    pub fn parse_identifiers_non_keywords(&mut self) -> Result<Vec<Ident>, ParserError> {
+    pub fn parse_identifiers_non_keywords(&mut self) -> Result<Vec<Ident>, SqlGenError> {
         let mut idents = vec![];
         loop {
             match self.peek_token() {
@@ -1783,7 +1794,7 @@ impl Parser {
     }
 
     /// Parse identifiers
-    pub fn parse_identifiers(&mut self) -> Result<Vec<Ident>, ParserError> {
+    pub fn parse_identifiers(&mut self) -> Result<Vec<Ident>, SqlGenError> {
         let mut idents = vec![];
         loop {
             match self.next_token() {
@@ -1799,7 +1810,7 @@ impl Parser {
     }
 
     /// Parse a simple one-word identifier (possibly quoted, possibly a keyword)
-    pub fn parse_identifier(&mut self) -> Result<Ident, ParserError> {
+    pub fn parse_identifier(&mut self) -> Result<Ident, SqlGenError> {
         match self.next_token() {
             Token::Word(w) => Ok(w.to_ident()),
             Token::SingleQuotedString(s) => Ok(Ident::with_quote('\'', s)),
@@ -1811,7 +1822,7 @@ impl Parser {
     pub fn parse_parenthesized_column_list(
         &mut self,
         optional: IsOptional,
-    ) -> Result<Vec<Ident>, ParserError> {
+    ) -> Result<Vec<Ident>, SqlGenError> {
         if self.consume_token(&Token::LParen) {
             let cols = self.parse_comma_separated(Parser::parse_identifier)?;
             self.expect_token(&Token::RParen)?;
@@ -1823,7 +1834,7 @@ impl Parser {
         }
     }
 
-    pub fn parse_optional_precision(&mut self) -> Result<Option<u64>, ParserError> {
+    pub fn parse_optional_precision(&mut self) -> Result<Option<u64>, SqlGenError> {
         if self.consume_token(&Token::LParen) {
             let n = self.parse_literal_uint()?;
             self.expect_token(&Token::RParen)?;
@@ -1835,7 +1846,7 @@ impl Parser {
 
     pub fn parse_optional_precision_scale(
         &mut self,
-    ) -> Result<(Option<u64>, Option<u64>), ParserError> {
+    ) -> Result<(Option<u64>, Option<u64>), SqlGenError> {
         if self.consume_token(&Token::LParen) {
             let n = self.parse_literal_uint()?;
             let scale = if self.consume_token(&Token::Comma) {
@@ -1854,7 +1865,7 @@ impl Parser {
     /// preceeded with some `WITH` CTE declarations and optionally followed
     /// by `ORDER BY`. Unlike some other parse_... methods, this one doesn't
     /// expect the initial keyword to be already consumed
-    pub fn parse_query(&mut self) -> Result<Query, ParserError> {
+    pub fn parse_query(&mut self) -> Result<Query, SqlGenError> {
         let with = if self.parse_keyword(Keyword::WITH) {
             Some(With {
                 recursive: self.parse_keyword(Keyword::RECURSIVE),
@@ -1914,7 +1925,7 @@ impl Parser {
     }
 
     /// Parse a CTE (`alias [( col1, col2, ... )] AS (subquery)`)
-    pub fn parse_cte(&mut self) -> Result<Cte, ParserError> {
+    pub fn parse_cte(&mut self) -> Result<Cte, SqlGenError> {
         let name = self.parse_identifier()?;
 
         let mut cte = if self.parse_keyword(Keyword::AS) {
@@ -1957,7 +1968,7 @@ impl Parser {
     ///   subquery ::= query_body [ order_by_limit ]
     ///   set_operation ::= query_body { 'UNION' | 'EXCEPT' | 'INTERSECT' } [ 'ALL' ] query_body
     /// ```
-    pub fn parse_query_body(&mut self, precedence: u8) -> Result<SetExpr, ParserError> {
+    pub fn parse_query_body(&mut self, precedence: u8) -> Result<SetExpr, SqlGenError> {
         // We parse the expression using a Pratt parser, as in `parse_expr()`.
         // Start by parsing a restricted SELECT or a `(subquery)`:
         let mut expr = if self.parse_keyword(Keyword::SELECT) {
@@ -2013,7 +2024,7 @@ impl Parser {
 
     /// Parse a restricted `SELECT` statement (no CTEs / `UNION` / `ORDER BY`),
     /// assuming the initial `SELECT` was already consumed
-    pub fn parse_select(&mut self) -> Result<Select, ParserError> {
+    pub fn parse_select(&mut self) -> Result<Select, SqlGenError> {
         let distinct = self.parse_all_or_distinct()?;
 
         let top = if self.parse_keyword(Keyword::TOP) {
@@ -2138,7 +2149,7 @@ impl Parser {
         })
     }
 
-    pub fn parse_table_and_joins(&mut self) -> Result<TableWithJoins, ParserError> {
+    pub fn parse_table_and_joins(&mut self) -> Result<TableWithJoins, SqlGenError> {
         let relation = self.parse_table_factor()?;
         // Note that for keywords to be properly handled here, they need to be
         // added to `RESERVED_FOR_TABLE_ALIAS`, otherwise they may be parsed as
@@ -2211,7 +2222,7 @@ impl Parser {
     }
 
     /// A table name or a parenthesized subquery, followed by optional `[AS] alias`
-    pub fn parse_table_factor(&mut self) -> Result<TableFactor, ParserError> {
+    pub fn parse_table_factor(&mut self) -> Result<TableFactor, SqlGenError> {
         if self.parse_keyword(Keyword::LATERAL) {
             // LATERAL must always be followed by a subquery.
             if !self.consume_token(&Token::LParen) {
@@ -2288,7 +2299,7 @@ impl Parser {
                         | TableFactor::TableFunction { alias, .. } => {
                             // but not `FROM (mytable AS alias1) AS alias2`.
                             if let Some(inner_alias) = alias {
-                                return Err(ParserError::ParserError(format!(
+                                return Err(SqlGenError::ParserError(format!(
                                     "duplicate alias {}",
                                     inner_alias.sql(&Default::default()).unwrap()
                                 )));
@@ -2365,7 +2376,7 @@ impl Parser {
     pub fn parse_derived_table_factor(
         &mut self,
         lateral: IsLateral,
-    ) -> Result<TableFactor, ParserError> {
+    ) -> Result<TableFactor, SqlGenError> {
         let subquery = Box::new(self.parse_query()?);
         self.expect_token(&Token::RParen)?;
         let alias = self.parse_optional_table_alias(keywords::RESERVED_FOR_TABLE_ALIAS)?;
@@ -2379,7 +2390,7 @@ impl Parser {
         })
     }
 
-    pub fn parse_join_constraint(&mut self, natural: bool) -> Result<JoinConstraint, ParserError> {
+    pub fn parse_join_constraint(&mut self, natural: bool) -> Result<JoinConstraint, SqlGenError> {
         if natural {
             Ok(JoinConstraint::Natural)
         } else if self.parse_keyword(Keyword::ON) {
@@ -2395,14 +2406,14 @@ impl Parser {
     }
 
     /// Parse a `var = expr` assignment, used in an UPDATE statement
-    pub fn parse_assignment(&mut self) -> Result<Assignment, ParserError> {
+    pub fn parse_assignment(&mut self) -> Result<Assignment, SqlGenError> {
         let id = self.parse_identifiers_non_keywords()?;
         self.expect_token(&Token::Eq)?;
         let value = self.parse_expr()?;
         Ok(Assignment { id, value })
     }
 
-    pub fn parse_function_args(&mut self) -> Result<FunctionArg, ParserError> {
+    pub fn parse_function_args(&mut self) -> Result<FunctionArg, SqlGenError> {
         if self.peek_nth_token(1) == Token::RArrow {
             let name = self.parse_identifier()?;
 
@@ -2415,7 +2426,7 @@ impl Parser {
         }
     }
 
-    pub fn parse_optional_args(&mut self) -> Result<Vec<FunctionArg>, ParserError> {
+    pub fn parse_optional_args(&mut self) -> Result<Vec<FunctionArg>, SqlGenError> {
         if self.consume_token(&Token::RParen) {
             Ok(vec![])
         } else {
@@ -2426,7 +2437,7 @@ impl Parser {
     }
 
     /// Parse a comma-delimited list of projections after SELECT
-    pub fn parse_select_item(&mut self) -> Result<SelectItem, ParserError> {
+    pub fn parse_select_item(&mut self) -> Result<SelectItem, SqlGenError> {
         match self.parse_wildcard_expr()? {
             WildcardExpr::Expr(expr) => self
                 .parse_optional_alias(keywords::RESERVED_FOR_COLUMN_ALIAS)
@@ -2440,7 +2451,7 @@ impl Parser {
     }
 
     /// Parse an expression, optionally followed by ASC or DESC (used in ORDER BY)
-    pub fn parse_order_by_expr(&mut self) -> Result<OrderByExpr, ParserError> {
+    pub fn parse_order_by_expr(&mut self) -> Result<OrderByExpr, SqlGenError> {
         let expr = self.parse_expr()?;
 
         let asc = if self.parse_keyword(Keyword::ASC) {
@@ -2468,7 +2479,7 @@ impl Parser {
 
     /// Parse a TOP clause, MSSQL equivalent of LIMIT,
     /// that follows after SELECT [DISTINCT].
-    pub fn parse_top(&mut self) -> Result<Top, ParserError> {
+    pub fn parse_top(&mut self) -> Result<Top, SqlGenError> {
         let quantity = if self.consume_token(&Token::LParen) {
             let quantity = self.parse_expr()?;
             self.expect_token(&Token::RParen)?;
@@ -2489,7 +2500,7 @@ impl Parser {
     }
 
     /// Parse a LIMIT clause
-    pub fn parse_limit(&mut self) -> Result<Option<Expr>, ParserError> {
+    pub fn parse_limit(&mut self) -> Result<Option<Expr>, SqlGenError> {
         if self.parse_keyword(Keyword::ALL) {
             Ok(None)
         } else {
@@ -2498,7 +2509,7 @@ impl Parser {
     }
 
     /// Parse an OFFSET clause
-    pub fn parse_offset(&mut self) -> Result<Offset, ParserError> {
+    pub fn parse_offset(&mut self) -> Result<Offset, SqlGenError> {
         let value = Expr::Value(self.parse_number_value()?);
         let rows = if self.parse_keyword(Keyword::ROW) {
             OffsetRows::Row
@@ -2511,7 +2522,7 @@ impl Parser {
     }
 
     /// Parse a FETCH clause
-    pub fn parse_fetch(&mut self) -> Result<Fetch, ParserError> {
+    pub fn parse_fetch(&mut self) -> Result<Fetch, SqlGenError> {
         self.expect_one_of_keywords(&[Keyword::FIRST, Keyword::NEXT])?;
         let (quantity, percent) = if self
             .parse_one_of_keywords(&[Keyword::ROW, Keyword::ROWS])
@@ -2539,7 +2550,7 @@ impl Parser {
     }
 
     /// Parse a FOR UPDATE/FOR SHARE clause
-    pub fn parse_lock(&mut self) -> Result<LockType, ParserError> {
+    pub fn parse_lock(&mut self) -> Result<LockType, SqlGenError> {
         match self.expect_one_of_keywords(&[Keyword::UPDATE, Keyword::SHARE])? {
             Keyword::UPDATE => Ok(LockType::Update),
             Keyword::SHARE => Ok(LockType::Share),
@@ -2547,7 +2558,7 @@ impl Parser {
         }
     }
 
-    pub fn parse_values(&mut self) -> Result<Values, ParserError> {
+    pub fn parse_values(&mut self) -> Result<Values, SqlGenError> {
         let values = self.parse_comma_separated(|parser| {
             parser.expect_token(&Token::LParen)?;
             let exprs = parser.parse_comma_separated(Parser::parse_expr)?;
@@ -2557,7 +2568,7 @@ impl Parser {
         Ok(Values(values))
     }
 
-    pub fn parse_merge_clauses(&mut self) -> Result<Vec<MergeClause>, ParserError> {
+    pub fn parse_merge_clauses(&mut self) -> Result<Vec<MergeClause>, SqlGenError> {
         let mut clauses: Vec<MergeClause> = vec![];
         loop {
             if self.peek_token() == Token::EOF || self.peek_token() == Token::SemiColon {
@@ -2584,7 +2595,7 @@ impl Parser {
                 ]) {
                     Some(Keyword::UPDATE) => {
                         if is_not_matched {
-                            return Err(ParserError::ParserError(
+                            return Err(SqlGenError::ParserError(
                                 "UPDATE in NOT MATCHED merge clause".to_string(),
                             ));
                         }
@@ -2597,7 +2608,7 @@ impl Parser {
                     }
                     Some(Keyword::DELETE) => {
                         if is_not_matched {
-                            return Err(ParserError::ParserError(
+                            return Err(SqlGenError::ParserError(
                                 "DELETE in NOT MATCHED merge clause".to_string(),
                             ));
                         }
@@ -2605,7 +2616,7 @@ impl Parser {
                     }
                     Some(Keyword::INSERT) => {
                         if !is_not_matched {
-                            return Err(ParserError::ParserError(
+                            return Err(SqlGenError::ParserError(
                                 "INSERT in MATCHED merge clause".to_string(),
                             ));
                         }
@@ -2619,12 +2630,12 @@ impl Parser {
                         }
                     }
                     Some(_) => {
-                        return Err(ParserError::ParserError(
+                        return Err(SqlGenError::ParserError(
                             "expected UPDATE, DELETE or INSERT in merge clause".to_string(),
                         ))
                     }
                     None => {
-                        return Err(ParserError::ParserError(
+                        return Err(SqlGenError::ParserError(
                             "expected UPDATE, DELETE or INSERT in merge clause".to_string(),
                         ))
                     }

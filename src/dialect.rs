@@ -2,6 +2,7 @@ use core::fmt::Debug;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::sync::Arc;
+use crate::parser::SqlGenError;
 
 #[derive(Clone, Debug)]
 pub struct Dialect {
@@ -262,9 +263,9 @@ impl Default for Dialect {
 }
 
 pub trait DialectDisplay {
-    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> fmt::Result;
+    fn fmt(&self, f: &mut (dyn fmt::Write), dialect: &Dialect) -> Result<(), SqlGenError>;
 
-    fn sql(&self, dialect: &Dialect) -> Result<String, fmt::Error>
+    fn sql(&self, dialect: &Dialect) -> Result<String, SqlGenError>
     where
         Self: Sized,
     {
